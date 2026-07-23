@@ -1,0 +1,273 @@
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native"]
+}
+
+datasource db {
+  provider  = "postgresql"
+}
+
+// ------------------------------------------------------------------
+// CORE: Tenant
+// ------------------------------------------------------------------
+
+model Tenant {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  externalId  String   @unique // Firmen-ID fürs Login
+  logoUrl     String?
+  isActive    Boolean  @default(true)
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  users       User[]
+  settings    TenantSetting[]
+  modules     TenantModule[]
+  files       File[]
+  auditLogs   AuditLog[]
+  roles       Role[]
+  employees   Employee[]
+
+
+  @@map("tenants")
+}
+
+model TenantSetting {
+  id        String @id @default(cuid())
+  tenantId  String @map("tenant_id")
+  key       String
+  value     String
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, key])
+  @@map("tenant_settings")
+}
+
+// ------------------------------------------------------------------
+// CORE: Identity & Access
+// ------------------------------------------------------------------
+
+model User {
+  id             String    @id @default(cuid())
+  tenantId       String @map("tenant_id")
+  email          String
+  passwordHash   String?
+  firstName      String?  @map("first_name")
+  lastName       String?  @map("last_name")
+  isActive       Boolean   @default(true)
+  isSystemAdmin  Boolean   @default(false)
+  emailVerified  DateTime? @map("email_verified")
+  lastLoginAt    DateTime? @map("last_login_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  roles          UserRole[]
+  permissions    UserPermission[]
+  files          File[]
+  auditLogs      AuditLog[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@map("users")
+}
+
+// ------------------------------------------------------------------
+// CORE: Permissions & Roles
+// ------------------------------------------------------------------
+
+model Role {
+  id          String @id @default(cuid())
+  tenantId    String @map("tenant_id")
+  name        String
+  description String?
+  isDefault   Boolean @default(false)
+  isAdmin     Boolean @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  permissions RolePermission[]
+  users       UserRole[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isAdmin])
+  @@map("roles")
+}
+
+model Permission {
+  id          String @id @default(cuid())
+  key         String @unique
+  module      String
+  resource    String
+  action      String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  rolePermissions RolePermission[]
+  userPermissions UserPermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  id           String @id @default(cuid())
+  tenantId     String @map("tenant_id")
+  roleId       String @map("role_id")
+  permissionId String @map("permission_id")
+
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, roleId, permissionId])
+  @@index([tenantId])
+  @@index([roleId])
+  @@index([permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  id       String @id @default(cuid())
+  tenantId String @map("tenant_id")
+  userId   String @map("user_id")
+  roleId   String @map("role_id")
+
+  user     User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role     Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId, roleId])
+  @@index([tenantId])
+  @@map("user_roles")
+}
+
+model UserPermission {
+  id           String @id @default(cuid())
+  tenantId     String @map("tenant_id")
+  userId       String @map("user_id")
+  permissionId String @map("permission_id")
+  granted      Boolean @default(true)
+
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId, permissionId])
+  @@index([tenantId])
+  @@map("user_permissions")
+}
+
+// ------------------------------------------------------------------
+// CORE: Files
+// ------------------------------------------------------------------
+
+model File {
+  id            String   @id @default(cuid())
+  tenantId      String @map("tenant_id")
+  uploadedById  String? @map("uploaded_by_id")
+  originalName  String
+  storageKey    String   @unique
+  mimeType      String
+  sizeBytes     Int
+  checksum      String?
+  isPublic      Boolean  @default(false)
+  expiresAt     DateTime?
+  metadata      Json?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  uploadedBy    User?    @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([tenantId, storageKey])
+  @@index([tenantId, uploadedById])
+  @@map("files")
+}
+
+// ------------------------------------------------------------------
+// CORE: Audit Log
+// ------------------------------------------------------------------
+
+model AuditLog {
+  id            String   @id @default(cuid())
+  tenantId      String @map("tenant_id")
+  userId        String? @map("user_id")
+  action        String
+  resourceType  String
+  resourceId    String?
+  metadata      Json?
+  ipAddress     String?
+  userAgent     String?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([userId])
+  @@map("audit_logs")
+}
+
+// ------------------------------------------------------------------
+// CORE: Module Registry
+// ------------------------------------------------------------------
+
+model ModuleDefinition {
+  id            String   @id @default(cuid())
+  key           String   @unique
+  name          String
+  description   String?
+  version       String   @default("1.0.0")
+  isCore        Boolean  @default(false)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  tenantModules TenantModule[]
+
+  @@map("module_definitions")
+}
+
+model TenantModule {
+  id        String @id @default(cuid())
+  tenantId  String @map("tenant_id")
+  moduleId  String @map("module_id")
+  isActive  Boolean @default(true)
+  config    Json?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  module    ModuleDefinition @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, moduleId])
+  @@map("tenant_modules")
+}
+
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  email     String
+  ipAddress String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([email, createdAt])
+  @@index([ipAddress, createdAt])
+  @@map("login_attempts")
+}
+
+model Employee {
+  id          String   @id @default(cuid())
+  tenantId    String   @map("tenant_id")
+  firstName   String   @map("first_name")
+  lastName    String   @map("last_name")
+  email       String?
+  position    String?
+  department  String?
+  startDate   DateTime? @map("start_date")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("employees")
+}
+
