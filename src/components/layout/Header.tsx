@@ -23,7 +23,9 @@ export default function Header() {
           </div>
           <div>
             <p className="text-sm font-medium text-gray-900">{session?.user?.name || session?.user?.email}</p>
-            <p className="text-xs text-gray-500">{session?.user?.email}</p>
+            {session?.user?.name && session?.user?.email && session.user.name !== session.user.email && (
+              <p className="text-xs text-gray-500">{session.user.email}</p>
+            )}
           </div>
         </div>
       </div>

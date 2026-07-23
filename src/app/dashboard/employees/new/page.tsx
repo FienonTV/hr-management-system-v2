@@ -1,16 +1,21 @@
-import { createEmployee } from "@/lib/actions/employees";
-import type { EmployeeInput } from "@/lib/schemas/employees";
-import { auth } from "@/lib/auth";
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
-export default async function NewEmployeePage() {
-  const session = await auth();
-  if (!session?.user) redirect("/login");
+export default function NewEmployeePage() {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  async function handleSubmit(formData: FormData) {
-    "use server";
-    const data: EmployeeInput = {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    const formData = new FormData(event.currentTarget);
+    const data = {
       firstName: String(formData.get("firstName") ?? ""),
       lastName: String(formData.get("lastName") ?? ""),
       email: String(formData.get("email") ?? "") || undefined,
@@ -20,11 +25,26 @@ export default async function NewEmployeePage() {
     };
 
     try {
-      await createEmployee(data);
-    } catch (error) {
-      throw error;
+      const response = await fetch("/api/employees", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setError(result.error || "Fehler beim Speichern");
+        setLoading(false);
+        return;
+      }
+
+      router.push("/dashboard/employees");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Fehler beim Speichern");
+      setLoading(false);
     }
-    redirect("/dashboard/employees");
   }
 
   return (
@@ -37,9 +57,14 @@ export default async function NewEmployeePage() {
       </div>
 
       <form
-        action={handleSubmit}
+        onSubmit={handleSubmit}
         className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm space-y-6"
       >
+        {error && (
+          <div className="rounded-md bg-red-50 p-4 text-sm text-red-600">
+            {error}
+          </div>
+        )}
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           <div className="space-y-2">
             <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
@@ -130,9 +155,10 @@ export default async function NewEmployeePage() {
           </Link>
           <button
             type="submit"
-            className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 transition-colors"
+            disabled={loading}
+            className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 transition-colors disabled:opacity-50"
           >
-            Speichern
+            {loading ? "Speichern..." : "Speichern"}
           </button>
         </div>
       </form>

@@ -6,7 +6,7 @@ import { Plus, Edit, User, Search } from "lucide-react";
 import { redirect } from "next/navigation";
 
 function initials(emp: Employee) {
-  return `${emp.lastName?.charAt(0) ?? ""}${emp.firstName?.charAt(0) ?? ""}`.toUpperCase();
+  return `${emp.firstName?.charAt(0) ?? ""}${emp.lastName?.charAt(0) ?? ""}`.toUpperCase();
 }
 
 export default async function EmployeesPage() {
@@ -81,7 +81,7 @@ export default async function EmployeesPage() {
                           </div>
                           <div className="ml-4">
                             <div className="text-sm font-medium text-gray-900">
-                              {employee.lastName} {employee.firstName}
+                              {employee.firstName} {employee.lastName}
                             </div>
                           </div>
                         </div>
