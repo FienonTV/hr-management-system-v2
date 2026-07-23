@@ -2,20 +2,15 @@ import { getEmployeeById, updateEmployee, deleteEmployee } from "@/lib/actions/e
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Employee } from "@prisma/client";
 
 export default async function EmployeeDetailPage({ params }: { params: Promise<{ id: string }> }) {
-
   const { id } = await params;
   const session = await auth();
   if (!session?.user) redirect("/login");
 
   try {
-    const employee = await getEmployeeById(id) as Employee | null;
+    const employee = (await getEmployeeById(id)) as Employee | null;
     if (!employee) {
       return <div className="p-4 text-red-600">Mitarbeiter nicht gefunden.</div>;
     }
@@ -40,50 +35,124 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
     }
 
     return (
-      <div className="max-w-2xl mx-auto space-y-6">
-        <div className="flex justify-between items-center">
-          <Link href="/dashboard/employees" className="text-blue-600 hover:underline">Zurück</Link>
+      <div className="max-w-3xl mx-auto space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Mitarbeiter bearbeiten</h1>
+            <p className="mt-2 text-sm text-gray-600">
+              Bearbeiten Sie die Informationen von {employee.firstName} {employee.lastName}.
+            </p>
+          </div>
+          <Link
+            href="/dashboard/employees"
+            className="text-sm font-medium text-primary-600 hover:text-primary-700"
+          >
+            ← Zurück zur Übersicht
+          </Link>
         </div>
-        <Card>
-          <CardHeader>
-            <CardTitle>Mitarbeiter Details</CardTitle>
-            <CardDescription>Bearbeiten Sie die Informationen von {employee.firstName} {employee.lastName}.</CardDescription>
-          </CardHeader>
-          <form action={handleUpdate}>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">Vorname</Label>
-                  <Input id="firstName" name="firstName" defaultValue={employee.firstName} required />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lastName">Nachname</Label>
-                  <Input id="lastName" name="lastName" defaultValue={employee.lastName} required />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">E-Mail</Label>
-                <Input id="email" name="email" type="email" defaultValue={employee.email || ""} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="position">Position</Label>
-                <Input id="position" name="position" defaultValue={employee.position || ""} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="department">Abteilung</Label>
-                <Input id="department" name="department" defaultValue={employee.department || ""} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="startDate">Startdatum</Label>
-                <Input id="startDate" name="startDate" type="date" defaultValue={employee.startDate?.toISOString().split("T")[0] || ""} />
-              </div>
-            </CardContent>
-            <CardFooter className="flex justify-between">
-              <Button variant="destructive" type="submit" formAction={handleDelete}>Löschen</Button>
-              <Button type="submit">Speichern</Button>
-            </CardFooter>
-          </form>
-        </Card>
+
+        <form
+          action={handleUpdate}
+          className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm space-y-6"
+        >
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+            <div className="space-y-2">
+              <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
+                Vorname
+              </label>
+              <input
+                id="firstName"
+                name="firstName"
+                type="text"
+                defaultValue={employee.firstName}
+                required
+                className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">
+                Nachname
+              </label>
+              <input
+                id="lastName"
+                name="lastName"
+                type="text"
+                defaultValue={employee.lastName}
+                required
+                className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              E-Mail
+            </label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              defaultValue={employee.email || ""}
+              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+            <div className="space-y-2">
+              <label htmlFor="position" className="block text-sm font-medium text-gray-700">
+                Position
+              </label>
+              <input
+                id="position"
+                name="position"
+                type="text"
+                defaultValue={employee.position || ""}
+                className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="department" className="block text-sm font-medium text-gray-700">
+                Abteilung
+              </label>
+              <input
+                id="department"
+                name="department"
+                type="text"
+                defaultValue={employee.department || ""}
+                className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="startDate" className="block text-sm font-medium text-gray-700">
+              Startdatum
+            </label>
+            <input
+              id="startDate"
+              name="startDate"
+              type="date"
+              defaultValue={employee.startDate?.toISOString().split("T")[0] || ""}
+              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+
+          <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+            <button
+              type="submit"
+              formAction={handleDelete}
+              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors"
+            >
+              Löschen
+            </button>
+            <button
+              type="submit"
+              className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 transition-colors"
+            >
+              Speichern
+            </button>
+          </div>
+        </form>
       </div>
     );
   } catch (error) {

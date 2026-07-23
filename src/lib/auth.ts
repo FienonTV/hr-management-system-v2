@@ -119,6 +119,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
         // Return user object for JWT
         return {
           id: user.id,
+          name: `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email,
           email: user.email,
           tenantId: user.tenantId,
           isSystemAdmin: user.isSystemAdmin,
