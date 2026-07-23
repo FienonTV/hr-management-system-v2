@@ -19,9 +19,10 @@ export async function withTenant<T>(
   }
 
   return prisma.$transaction(async (tx) => {
-    // Set the tenant context for the current transaction
-    // Use template literal for parameters to avoid SQL injection via $executeRaw
-    await tx.$executeRaw`SET LOCAL app.current_tenant = ${tenantId}`;
+    // Set the tenant context for the current transaction.
+    // $executeRawUnsafe is used because `SET LOCAL` cannot be executed as a prepared statement.
+    const escapedTenantId = tenantId.replace(/'/g, "''");
+    await tx.$executeRawUnsafe(`SET LOCAL app.current_tenant = '${escapedTenantId}'`);
 
     return operation(tx);
   });
