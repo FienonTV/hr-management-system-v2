@@ -1,6 +1,6 @@
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { prisma } from "./db/prisma";
+import { prismaAdmin } from "./db/prisma";
 import { compare } from "bcryptjs";
 import { logAudit } from "./audit";
 import type { User as NextAuthUser } from "next-auth";
@@ -23,7 +23,7 @@ function isAppUser(user: NextAuthUser): user is AppUser {
 async function isRateLimited(email: string, ipAddress: string) {
   const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
 
-  const attempts = await prisma.loginAttempt.count({
+  const attempts = await prismaAdmin.loginAttempt.count({
     where: {
       OR: [{ email }, { ipAddress }],
       createdAt: { gte: fifteenMinutesAgo },
@@ -34,7 +34,7 @@ async function isRateLimited(email: string, ipAddress: string) {
 }
 
 async function recordLoginAttempt(email: string, ipAddress: string) {
-  await prisma.loginAttempt.create({
+  await prismaAdmin.loginAttempt.create({
     data: { email, ipAddress },
   });
 }
@@ -65,7 +65,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
         }
 
         // 2. Tenant suchen anhand externalId
-        const tenant = await prisma.tenant.findUnique({
+        const tenant = await prismaAdmin.tenant.findUnique({
           where: { externalId },
         });
 
@@ -75,7 +75,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
         }
 
         // 3. User suchen anhand tenantId + email
-        const user = await prisma.user.findUnique({
+        const user = await prismaAdmin.user.findUnique({
           where: {
             tenantId_email: {
               tenantId: tenant.id,

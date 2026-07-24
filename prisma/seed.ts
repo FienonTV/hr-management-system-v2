@@ -5,9 +5,14 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from 'bcryptjs';
 
 async function main() {
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-  });
+  // Seed uses the unrestricted admin DB user (DIRECT_URL) so it can create
+  // tenant-scoped rows without needing an RLS tenant context.
+  const connectionString = process.env.DIRECT_URL || process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error("DIRECT_URL or DATABASE_URL must be set");
+  }
+
+  const pool = new Pool({ connectionString });
   const adapter = new PrismaPg(pool);
   const prisma = new PrismaClient({ adapter });
 

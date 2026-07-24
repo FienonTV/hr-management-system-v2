@@ -1,6 +1,6 @@
 import "@auth/core/types";
 
-declare module "@auth/core/types" {
+declare module "next-auth" {
   interface User {
     id: string;
     tenantId: string;
