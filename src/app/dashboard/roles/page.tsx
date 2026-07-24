@@ -68,7 +68,14 @@ export default async function RolesPage() {
                           <Edit className="h-4 w-4" />
                         </Link>
                         {!role.isAdmin && (
-                          <form action={`/api/roles/${role.id}/delete`} method="POST" className="inline">
+                          <form
+                            action={async () => {
+                              'use server';
+                              const { deleteRole } = await import('@/lib/actions/roles');
+                              await deleteRole(role.id);
+                            }}
+                            className="inline"
+                          >
                             <button
                               type="submit"
                               className="rounded-lg p-2 text-gray-500 hover:bg-red-50 hover:text-red-600"

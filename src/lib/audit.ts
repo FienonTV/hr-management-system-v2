@@ -11,7 +11,15 @@ export type AuditAction =
   | "tenant.activate"
   | "tenant.deactivate"
   | "file.upload"
-  | "file.download";
+  | "file.download"
+  | "employee.create"
+  | "employee.update"
+  | "employee.delete"
+  | "role.create"
+  | "role.update"
+  | "role.delete"
+  | "user.role.assign"
+  | "user.role.remove";
 
 interface LogAuditParams {
   tenantId: string;

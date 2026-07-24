@@ -1,17 +1,43 @@
 import { getAuditLogs } from "@/lib/actions/audit";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { ClipboardList, User, Shield } from "lucide-react";
+import { ClipboardList, User, Shield, Users, Briefcase } from "lucide-react";
 
 function actionIcon(action: string) {
   if (action.startsWith("auth.")) return <User className="h-4 w-4" />;
-  if (action.startsWith("permissions.")) return <Shield className="h-4 w-4" />;
+  if (action.startsWith("permissions.") || action.startsWith("role.")) return <Shield className="h-4 w-4" />;
+  if (action.startsWith("user.")) return <Users className="h-4 w-4" />;
+  if (action.startsWith("employee.")) return <Briefcase className="h-4 w-4" />;
   return <ClipboardList className="h-4 w-4" />;
 }
 
-export default async function AuditLogPage() {
+function actionLabel(action: string) {
+  const labels: Record<string, string> = {
+    "auth.login": "Anmeldung",
+    "auth.logout": "Abmeldung",
+    "auth.login_failed": "Anmeldung fehlgeschlagen",
+    "employee.create": "Mitarbeiter erstellt",
+    "employee.update": "Mitarbeiter bearbeitet",
+    "employee.delete": "Mitarbeiter gelöscht",
+    "role.create": "Rolle erstellt",
+    "role.update": "Rolle bearbeitet",
+    "role.delete": "Rolle gelöscht",
+    "user.role.assign": "Rolle zugewiesen",
+    "user.role.remove": "Rolle entfernt",
+  };
+  return labels[action] || action;
+}
+
+export default async function AuditLogPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ action?: string }>;
+}) {
   const session = await auth();
   if (!session?.user) redirect("/login");
+
+  const filters = await searchParams;
+  const filterAction = filters.action;
 
   let logs: Awaited<ReturnType<typeof getAuditLogs>> = [];
   let error: string | null = null;
@@ -22,12 +48,46 @@ export default async function AuditLogPage() {
     error = e instanceof Error ? e.message : "Fehler beim Laden des Audit-Logs";
   }
 
+  if (filterAction) {
+    logs = logs.filter((log) => log.action === filterAction || log.action.startsWith(filterAction.replace("*", "")));
+  }
+
+  const actionOptions = [
+    { value: "", label: "Alle Aktionen" },
+    { value: "auth.", label: "Authentifizierung" },
+    { value: "employee.", label: "Mitarbeiter" },
+    { value: "role.", label: "Rollen" },
+    { value: "user.role.", label: "Benutzerrollen" },
+  ];
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Audit-Log</h1>
-        <p className="mt-2 text-sm text-gray-600">Sicherheitsrelevante Ereignisse im System.</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Audit-Log</h1>
+          <p className="mt-2 text-sm text-gray-600">Sicherheitsrelevante Ereignisse im System.</p>
+        </div>
       </div>
+
+      <form className="flex items-center space-x-4" method="GET">
+        <label className="text-sm font-medium text-gray-700" htmlFor="action">Filter:</label>
+        <select
+          id="action"
+          name="action"
+          defaultValue={filterAction || ""}
+          className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+        >
+          {actionOptions.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+        <button
+          type="submit"
+          className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 transition-colors"
+        >
+          Anwenden
+        </button>
+      </form>
 
       {error && (
         <div className="rounded-md bg-red-50 p-4 text-sm text-red-600">{error}</div>
@@ -60,7 +120,7 @@ export default async function AuditLogPage() {
                     <td className="whitespace-nowrap px-6 py-4">
                       <div className="flex items-center space-x-2 text-sm text-gray-900">
                         {actionIcon(log.action)}
-                        <span>{log.action}</span>
+                        <span>{actionLabel(log.action)}</span>
                       </div>
                     </td>
                     <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">

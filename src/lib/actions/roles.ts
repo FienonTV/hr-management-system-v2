@@ -2,7 +2,8 @@
 
 import { withTenant } from "@/lib/db/tenant";
 import { requirePermission } from "@/lib/permissions";
-import type { Role, Permission } from "@prisma/client";
+import { logAudit } from "@/lib/audit";
+import type { Role, Permission, User } from "@prisma/client";
 
 export type RoleWithPermissions = Role & {
   permissions: (Permission & { permission: Permission })[];
@@ -18,7 +19,7 @@ export async function getRoles(): Promise<Role[]> {
   });
 }
 
-export async function getRoleById(id: string): Promise<Role & { permissions: Permission[] } | null> {
+export async function getRoleById(id: string): Promise<(Role & { permissions: Permission[] }) | null> {
   const { tenantId } = await requirePermission("roles:read");
   return withTenant(tenantId, async (tx) => {
     const role = await tx.role.findUnique({
@@ -50,7 +51,7 @@ export async function createRole(
   name: string,
   permissionKeys: string[]
 ): Promise<{ success: boolean; error?: string }> {
-  const { tenantId } = await requirePermission("roles:create");
+  const { tenantId, session } = await requirePermission("roles:create");
 
   if (!name.trim()) {
     return { success: false, error: "Name ist erforderlich" };
@@ -68,7 +69,7 @@ export async function createRole(
       where: { key: { in: permissionKeys } },
     });
 
-    await tx.role.create({
+    const role = await tx.role.create({
       data: {
         tenantId,
         name: name.trim(),
@@ -82,6 +83,15 @@ export async function createRole(
       },
     });
 
+    await logAudit({
+      tenantId,
+      userId: session.user.id,
+      action: "role.create",
+      resourceType: "role",
+      resourceId: role.id,
+      metadata: { name: role.name, permissions: permissionKeys },
+    });
+
     return { success: true };
   });
 }
@@ -91,7 +101,7 @@ export async function updateRole(
   name: string,
   permissionKeys: string[]
 ): Promise<{ success: boolean; error?: string }> {
-  const { tenantId } = await requirePermission("roles:update");
+  const { tenantId, session } = await requirePermission("roles:update");
 
   if (!name.trim()) {
     return { success: false, error: "Name ist erforderlich" };
@@ -104,12 +114,15 @@ export async function updateRole(
     if (!existing || existing.tenantId !== tenantId) {
       return { success: false, error: "Rolle nicht gefunden" };
     }
+    if (existing.isAdmin) {
+      return { success: false, error: "Die Admin-Rolle kann nicht bearbeitet werden" };
+    }
 
     const permissions = await tx.permission.findMany({
       where: { key: { in: permissionKeys } },
     });
 
-    await tx.role.update({
+    const role = await tx.role.update({
       where: { id },
       data: {
         name: name.trim(),
@@ -123,12 +136,21 @@ export async function updateRole(
       },
     });
 
+    await logAudit({
+      tenantId,
+      userId: session.user.id,
+      action: "role.update",
+      resourceType: "role",
+      resourceId: id,
+      metadata: { name: role.name, permissions: permissionKeys },
+    });
+
     return { success: true };
   });
 }
 
 export async function deleteRole(id: string): Promise<{ success: boolean; error?: string }> {
-  const { tenantId } = await requirePermission("roles:delete");
+  const { tenantId, session } = await requirePermission("roles:delete");
 
   return withTenant(tenantId, async (tx) => {
     const existing = await tx.role.findUnique({
@@ -143,6 +165,114 @@ export async function deleteRole(id: string): Promise<{ success: boolean; error?
 
     await tx.role.delete({
       where: { id },
+    });
+
+    await logAudit({
+      tenantId,
+      userId: session.user.id,
+      action: "role.delete",
+      resourceType: "role",
+      resourceId: id,
+      metadata: { name: existing.name },
+    });
+
+    return { success: true };
+  });
+}
+
+// --- User-Role management ---
+
+export async function getUsers(): Promise<User[]> {
+  const { tenantId } = await requirePermission("users:read");
+  return withTenant(tenantId, async (tx) => {
+    return tx.user.findMany({
+      where: { tenantId },
+      orderBy: { email: "asc" },
+    });
+  });
+}
+
+export async function getUserRoles(userId: string): Promise<Role[]> {
+  const { tenantId } = await requirePermission("users:read");
+  return withTenant(tenantId, async (tx) => {
+    const userRoles = await tx.userRole.findMany({
+      where: { userId, tenantId },
+      include: { role: true },
+    });
+    return userRoles.map((ur) => ur.role);
+  });
+}
+
+export async function assignRoleToUser(
+  userId: string,
+  roleId: string
+): Promise<{ success: boolean; error?: string }> {
+  const { tenantId, session } = await requirePermission("users:update");
+
+  return withTenant(tenantId, async (tx) => {
+    const user = await tx.user.findUnique({ where: { id: userId } });
+    const role = await tx.role.findUnique({ where: { id: roleId } });
+    if (!user || user.tenantId !== tenantId) {
+      return { success: false, error: "Benutzer nicht gefunden" };
+    }
+    if (!role || role.tenantId !== tenantId) {
+      return { success: false, error: "Rolle nicht gefunden" };
+    }
+
+    await tx.userRole.upsert({
+      where: {
+        tenantId_userId_roleId: {
+          tenantId,
+          userId,
+          roleId,
+        },
+      },
+      update: {},
+      create: {
+        tenantId,
+        userId,
+        roleId,
+      },
+    });
+
+    await logAudit({
+      tenantId,
+      userId: session.user.id,
+      action: "user.role.assign",
+      resourceType: "user",
+      resourceId: userId,
+      metadata: { roleId, roleName: role.name, userEmail: user.email },
+    });
+
+    return { success: true };
+  });
+}
+
+export async function removeRoleFromUser(
+  userId: string,
+  roleId: string
+): Promise<{ success: boolean; error?: string }> {
+  const { tenantId, session } = await requirePermission("users:update");
+
+  return withTenant(tenantId, async (tx) => {
+    const user = await tx.user.findUnique({ where: { id: userId } });
+    const role = await tx.role.findUnique({ where: { id: roleId } });
+
+    await tx.userRole.deleteMany({
+      where: {
+        tenantId,
+        userId,
+        roleId,
+      },
+    });
+
+    await logAudit({
+      tenantId,
+      userId: session.user.id,
+      action: "user.role.remove",
+      resourceType: "user",
+      resourceId: userId,
+      metadata: { roleId, roleName: role?.name, userEmail: user?.email },
     });
 
     return { success: true };

@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { Employee } from "@prisma/client";
 import { EmployeeSchema } from "@/lib/schemas/employees";
 import type { EmployeeInput } from "@/lib/schemas/employees";
+import { logAudit } from "@/lib/audit";
 
 export async function getEmployees(): Promise<Employee[]> {
   const { tenantId } = await requirePermission("employees:read");
@@ -27,12 +28,12 @@ export async function getEmployeeById(id: string): Promise<Employee | null> {
 }
 
 export async function createEmployee(data: EmployeeInput): Promise<{ success: boolean }> {
-  const { tenantId } = await requirePermission("employees:create");
+  const { tenantId, session } = await requirePermission("employees:create");
   const validated = EmployeeSchema.parse(data);
   const { startDate, ...employeeData } = validated;
 
   return withTenant(tenantId, async (tx) => {
-    await tx.employee.create({
+    const employee = await tx.employee.create({
       data: {
         ...employeeData,
         startDate: startDate ? new Date(startDate) : null,
@@ -40,17 +41,27 @@ export async function createEmployee(data: EmployeeInput): Promise<{ success: bo
       },
     });
     revalidatePath('/dashboard/employees');
+
+    await logAudit({
+      tenantId,
+      userId: session.user.id,
+      action: "employee.create",
+      resourceType: "employee",
+      resourceId: employee.id,
+      metadata: { firstName: employee.firstName, lastName: employee.lastName },
+    });
+
     return { success: true };
   });
 }
 
 export async function updateEmployee(id: string, data: EmployeeInput): Promise<{ success: boolean }> {
-  const { tenantId } = await requirePermission("employees:update");
+  const { tenantId, session } = await requirePermission("employees:update");
   const validated = EmployeeSchema.parse(data);
   const { startDate, ...employeeData } = validated;
 
   return withTenant(tenantId, async (tx) => {
-    await tx.employee.update({
+    const employee = await tx.employee.update({
       where: { id },
       data: {
         ...employeeData,
@@ -59,17 +70,36 @@ export async function updateEmployee(id: string, data: EmployeeInput): Promise<{
     });
     revalidatePath('/dashboard/employees');
     revalidatePath(`/dashboard/employees/${id}`);
+
+    await logAudit({
+      tenantId,
+      userId: session.user.id,
+      action: "employee.update",
+      resourceType: "employee",
+      resourceId: id,
+      metadata: { firstName: employee.firstName, lastName: employee.lastName },
+    });
+
     return { success: true };
   });
 }
 
 export async function deleteEmployee(id: string): Promise<{ success: boolean }> {
-  const { tenantId } = await requirePermission("employees:delete");
+  const { tenantId, session } = await requirePermission("employees:delete");
   return withTenant(tenantId, async (tx) => {
     await tx.employee.delete({
       where: { id },
     });
     revalidatePath('/dashboard/employees');
+
+    await logAudit({
+      tenantId,
+      userId: session.user.id,
+      action: "employee.delete",
+      resourceType: "employee",
+      resourceId: id,
+    });
+
     return { success: true };
   });
 }

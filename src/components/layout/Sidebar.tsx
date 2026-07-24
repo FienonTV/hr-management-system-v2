@@ -8,6 +8,7 @@ import {
   Shield,
   ClipboardList,
   LogOut,
+  UserCog,
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 
@@ -26,6 +27,11 @@ const navigation = [
     name: 'Rollen',
     href: '/dashboard/roles',
     icon: Shield,
+  },
+  {
+    name: 'Benutzer',
+    href: '/dashboard/users',
+    icon: UserCog,
   },
   {
     name: 'Audit-Log',
