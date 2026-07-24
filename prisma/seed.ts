@@ -1,4 +1,6 @@
-import 'dotenv/config';
+import { config } from 'dotenv';
+config({ path: '.env.local' });
+
 import { PrismaClient } from '@prisma/client';
 import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
@@ -44,6 +46,29 @@ async function main() {
     },
   });
 
+  // Upsert default permissions
+  const permissionDefinitions = [
+    { key: 'employees:read', module: 'employees', resource: 'employee', action: 'read', description: 'Mitarbeiter anzeigen' },
+    { key: 'employees:create', module: 'employees', resource: 'employee', action: 'create', description: 'Mitarbeiter erstellen' },
+    { key: 'employees:update', module: 'employees', resource: 'employee', action: 'update', description: 'Mitarbeiter bearbeiten' },
+    { key: 'employees:delete', module: 'employees', resource: 'employee', action: 'delete', description: 'Mitarbeiter löschen' },
+    { key: 'roles:read', module: 'roles', resource: 'role', action: 'read', description: 'Rollen anzeigen' },
+    { key: 'roles:create', module: 'roles', resource: 'role', action: 'create', description: 'Rollen erstellen' },
+    { key: 'roles:update', module: 'roles', resource: 'role', action: 'update', description: 'Rollen bearbeiten' },
+    { key: 'roles:delete', module: 'roles', resource: 'role', action: 'delete', description: 'Rollen löschen' },
+    { key: 'audit:read', module: 'audit', resource: 'auditLog', action: 'read', description: 'Audit-Log anzeigen' },
+  ];
+
+  const permissions = await Promise.all(
+    permissionDefinitions.map((def) =>
+      prisma.permission.upsert({
+        where: { key: def.key },
+        update: {},
+        create: def,
+      })
+    )
+  );
+
   // Create the default Admin role for the tenant
   const adminRole = await prisma.role.upsert({
     where: {
@@ -59,6 +84,27 @@ async function main() {
       isAdmin: true,
     },
   });
+
+  // Grant all permissions to the Admin role
+  await Promise.all(
+    permissions.map((permission) =>
+      prisma.rolePermission.upsert({
+        where: {
+          tenantId_roleId_permissionId: {
+            tenantId: tenant.id,
+            roleId: adminRole.id,
+            permissionId: permission.id,
+          },
+        },
+        update: {},
+        create: {
+          tenantId: tenant.id,
+          roleId: adminRole.id,
+          permissionId: permission.id,
+        },
+      })
+    )
+  );
 
   // Assign Admin role to the user
   const adminUser = await prisma.user.findUnique({

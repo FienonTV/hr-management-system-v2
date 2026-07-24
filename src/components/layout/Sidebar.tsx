@@ -5,6 +5,8 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
   Users,
+  Shield,
+  ClipboardList,
   LogOut,
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
@@ -19,6 +21,16 @@ const navigation = [
     name: 'Mitarbeiter',
     href: '/dashboard/employees',
     icon: Users,
+  },
+  {
+    name: 'Rollen',
+    href: '/dashboard/roles',
+    icon: Shield,
+  },
+  {
+    name: 'Audit-Log',
+    href: '/dashboard/audit',
+    icon: ClipboardList,
   },
 ];
 

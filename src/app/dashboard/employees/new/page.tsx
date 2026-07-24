@@ -14,7 +14,8 @@ export default function NewEmployeePage() {
     setLoading(true);
     setError(null);
 
-    const formData = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const formData = new FormData(form);
     const data = {
       firstName: String(formData.get("firstName") ?? ""),
       lastName: String(formData.get("lastName") ?? ""),
@@ -31,14 +32,17 @@ export default function NewEmployeePage() {
         body: JSON.stringify(data),
       });
 
-      const result = await response.json();
+      // Some error paths may return an empty body (e.g. middleware/auth).
+      const text = await response.text();
+      const result = text ? (JSON.parse(text) as { error?: string }) : {};
 
       if (!response.ok) {
-        setError(result.error || "Fehler beim Speichern");
+        setError(result.error || `Fehler beim Speichern (${response.status})`);
         setLoading(false);
         return;
       }
 
+      form.reset();
       router.push("/dashboard/employees");
       router.refresh();
     } catch (err) {
