@@ -11,9 +11,14 @@ export const employeesModule: ModuleConfig = {
     { key: "employees:create", module: "employees", resource: "employee", action: "create", description: "Mitarbeiter erstellen" },
     { key: "employees:update", module: "employees", resource: "employee", action: "update", description: "Mitarbeiter bearbeiten" },
     { key: "employees:delete", module: "employees", resource: "employee", action: "delete", description: "Mitarbeiter löschen" },
+    { key: "documents:read", module: "employees", resource: "document", action: "read", description: "Dokumente anzeigen" },
+    { key: "documents:create", module: "employees", resource: "document", action: "create", description: "Dokumente erstellen" },
+    { key: "documents:update", module: "employees", resource: "document", action: "update", description: "Dokumente bearbeiten" },
+    { key: "documents:delete", module: "employees", resource: "document", action: "delete", description: "Dokumente löschen" },
   ],
   menuItems: [
     { id: "employees-list", label: "Mitarbeiter", path: "/dashboard/modules/employees", iconKey: "Users", requiredPermission: "employees:read" },
+    { id: "documents-list", label: "Dokumente", path: "/dashboard/modules/documents", iconKey: "FileText", requiredPermission: "documents:read" },
   ],
 };
 

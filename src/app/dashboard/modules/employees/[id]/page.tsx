@@ -43,7 +43,7 @@ import { createInvitation } from "@/lib/actions/invitations";
 import { listFiles, deleteFile } from "@/lib/actions/files";
 import { createEmployeeDocument, getEmployeeDocuments, deleteEmployeeDocument } from "@/lib/actions/employeeDocuments";
 
-import type { Employee, EmploymentContract, RoleOption, EmployeeUserData, FileItem, EmployeeDocument } from "./types";
+import type { Employee, EmploymentContract, RoleOption, EmployeeUserData, FileItem, DocumentContainer } from "./types";
 import type { EmploymentContractInput } from "@/lib/schemas/employees";
 
 type Tab = "stammdaten" | "vertraege" | "dokumente" | "user";
@@ -60,7 +60,7 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [contracts, setContracts] = useState<EmploymentContract[]>([]);
   const [files, setFiles] = useState<FileItem[]>([]);
-  const [documents, setDocuments] = useState<EmployeeDocument[]>([]);
+  const [documents, setDocuments] = useState<DocumentContainer[]>([]);
   const [activeTab, setActiveTab] = useState<Tab>("stammdaten");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -829,9 +829,9 @@ function DocumentsTab({
 }: {
   employeeId: string;
   files: FileItem[];
-  documents: EmployeeDocument[];
+  documents: DocumentContainer[];
   onFilesChange: (files: FileItem[]) => void;
-  onDocumentsChange: (documents: EmployeeDocument[]) => void;
+  onDocumentsChange: (documents: DocumentContainer[]) => void;
 }) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1064,36 +1064,40 @@ function DocumentsTab({
           <p className="mt-4 text-sm text-gray-500">Noch keine Dokumente zugeordnet.</p>
         ) : (
           <ul className="mt-4 divide-y divide-gray-200">
-            {documents.map((doc) => (
-              <li key={doc.id} className="flex items-center justify-between py-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-gray-900">{doc.file.originalName}</p>
-                  <p className="text-xs text-gray-500">
-                    {doc.documentType} · {formatBytes(doc.file.sizeBytes)} · {new Date(doc.createdAt).toLocaleDateString("de-DE")}
-                    {doc.validFrom && <span className="ml-2">gültig ab {new Date(doc.validFrom).toLocaleDateString("de-DE")}</span>}
-                    {doc.validUntil && <span className="ml-2">gültig bis {new Date(doc.validUntil).toLocaleDateString("de-DE")}</span>}
-                  </p>
-                </div>
-                <div className="ml-4 flex items-center space-x-2">
-                  <a
-                    href={`/api/files/${doc.file.id}`}
-                    download
-                    className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-primary-600"
-                    title="Herunterladen"
-                  >
-                    <Download className="h-4 w-4" />
-                  </a>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteDocument(doc.id)}
-                    className="rounded-lg p-2 text-gray-500 hover:bg-red-50 hover:text-red-600"
-                    title="Zuordnung entfernen"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              </li>
-            ))}
+            {documents.map((doc) => {
+              const file = doc.files[0];
+              if (!file) return null;
+              return (
+                <li key={doc.id} className="flex items-center justify-between py-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-gray-900">{file.originalName}</p>
+                    <p className="text-xs text-gray-500">
+                      {doc.title} · {formatBytes(file.sizeBytes)} · {new Date(doc.createdAt).toLocaleDateString("de-DE")}
+                      {doc.validFrom && <span className="ml-2">gültig ab {new Date(doc.validFrom).toLocaleDateString("de-DE")}</span>}
+                      {doc.expiresAt && <span className="ml-2">gültig bis {new Date(doc.expiresAt).toLocaleDateString("de-DE")}</span>}
+                    </p>
+                  </div>
+                  <div className="ml-4 flex items-center space-x-2">
+                    <a
+                      href={`/api/files/${file.id}`}
+                      download
+                      className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-primary-600"
+                      title="Herunterladen"
+                    >
+                      <Download className="h-4 w-4" />
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteDocument(doc.id)}
+                      className="rounded-lg p-2 text-gray-500 hover:bg-red-50 hover:text-red-600"
+                      title="Zuordnung entfernen"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>

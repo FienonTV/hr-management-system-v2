@@ -1,4 +1,4 @@
-import type { Employee as PrismaEmployee, EmploymentContract as PrismaContract, File as PrismaFile, User, EmployeeDocument as PrismaEmployeeDocument } from "@prisma/client";
+import type { Employee as PrismaEmployee, EmploymentContract as PrismaContract, File as PrismaFile, User, DocumentContainer as PrismaDocumentContainer, DocumentCategory as PrismaDocumentCategory } from "@prisma/client";
 
 export type Employee = Omit<PrismaEmployee, "address" | "sensitiveData"> & {
   address: unknown;
@@ -21,7 +21,13 @@ export type EmploymentContract = PrismaContract;
 
 export type FileItem = PrismaFile;
 
-export type EmployeeDocument = PrismaEmployeeDocument & { file: PrismaFile };
+export type DocumentContainer = PrismaDocumentContainer & {
+  files: PrismaFile[];
+  categories?: PrismaDocumentCategory[];
+  uploadedBy?: { firstName: string | null; lastName: string | null; email: string } | null;
+};
+
+export type DocumentCategory = PrismaDocumentCategory;
 
 export type RoleOption = { id: string; name: string };
 

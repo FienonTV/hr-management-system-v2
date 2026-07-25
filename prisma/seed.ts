@@ -63,6 +63,7 @@ async function main() {
     { key: 'files:delete', module: 'files', resource: 'file', action: 'delete', description: 'Dateien löschen' },
     { key: 'documents:read', module: 'documents', resource: 'document', action: 'read', description: 'Dokumente anzeigen' },
     { key: 'documents:create', module: 'documents', resource: 'document', action: 'create', description: 'Dokumente erstellen' },
+    { key: 'documents:update', module: 'documents', resource: 'document', action: 'update', description: 'Dokumente bearbeiten' },
     { key: 'documents:delete', module: 'documents', resource: 'document', action: 'delete', description: 'Dokumente löschen' },
     { key: 'settings:read', module: 'settings', resource: 'tenantSetting', action: 'read', description: 'Einstellungen anzeigen' },
     { key: 'settings:update', module: 'settings', resource: 'tenantSetting', action: 'update', description: 'Einstellungen bearbeiten' },

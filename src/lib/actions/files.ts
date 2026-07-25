@@ -9,18 +9,100 @@ import { randomUUID } from "node:crypto";
 import { createHash } from "node:crypto";
 import type { FileCategory, File as FileRecord } from "@prisma/client";
 
-const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
-const ALLOWED_MIME_PREFIXES = [
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+const MAX_FILE_NAME_LENGTH = 255;
+
+// MIME type whitelist (exact or prefix)
+const ALLOWED_MIME_TYPES: (string | RegExp)[] = [
   "application/pdf",
-  "image/",
+  /^image\/(png|jpeg|jpg|gif|webp|svg\+xml|bmp)$/,
   "application/msword",
-  "application/vnd.openxmlformats-officedocument.",
-  "application/vnd.oasis.opendocument.",
-  "text/",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/vnd.oasis.opendocument.text",
+  "application/vnd.oasis.opendocument.spreadsheet",
+  "text/plain",
+  "text/csv",
+];
+
+interface FileSignature {
+  mime: string;
+  signatures: (number[] | ((header: number[]) => boolean))[];
+}
+
+// Magic bytes for common document/image formats
+const FILE_SIGNATURES: FileSignature[] = [
+  {
+    mime: "application/pdf",
+    signatures: [[0x25, 0x50, 0x44, 0x46]], // %PDF
+  },
+  {
+    mime: "image/png",
+    signatures: [[0x89, 0x50, 0x4e, 0x47]], // PNG
+  },
+  {
+    mime: "image/jpeg",
+    signatures: [
+      [0xff, 0xd8, 0xff, 0xe0],
+      [0xff, 0xd8, 0xff, 0xe1],
+      [0xff, 0xd8, 0xff, 0xe8],
+      [0xff, 0xd8, 0xff, 0xdb],
+      [0xff, 0xd8, 0xff, 0xee],
+    ],
+  },
+  {
+    mime: "image/gif",
+    signatures: [
+      [0x47, 0x49, 0x46, 0x38, 0x37, 0x61], // GIF87a
+      [0x47, 0x49, 0x46, 0x38, 0x39, 0x61], // GIF89a
+    ],
+  },
+  {
+    mime: "image/webp",
+    signatures: [
+      (header) =>
+        header.length >= 12 &&
+        header[0] === 0x52 &&
+        header[1] === 0x49 &&
+        header[2] === 0x46 &&
+        header[3] === 0x46 &&
+        header[8] === 0x57 &&
+        header[9] === 0x45 &&
+        header[10] === 0x42 &&
+        header[11] === 0x50,
+    ],
+  },
+  {
+    mime: "image/bmp",
+    signatures: [[0x42, 0x4d]], // BM
+  },
+  {
+    mime: "image/svg+xml",
+    signatures: [
+      (header) => {
+        const prefix = String.fromCharCode(...header.slice(0, 100)).toLowerCase();
+        return prefix.includes("<?xml") && prefix.includes("svg");
+      },
+    ],
+  },
+  {
+    mime: "application/zip",
+    signatures: [
+      [0x50, 0x4b, 0x03, 0x04],
+      [0x50, 0x4b, 0x05, 0x06],
+      [0x50, 0x4b, 0x07, 0x08],
+    ],
+  },
 ];
 
 function sanitizeFileName(name: string): string {
-  return name.replace(/[^a-zA-Z0-9._-]/g, "_").replace(/_{2,}/g, "_");
+  const base = name.replace(/[^a-zA-Z0-9._-\u00C0-\u017F\s]/g, "_").replace(/_{2,}/g, "_").trim();
+  if (base.length > MAX_FILE_NAME_LENGTH) {
+    const ext = base.lastIndexOf(".") > 0 ? base.slice(base.lastIndexOf(".")) : "";
+    return base.slice(0, MAX_FILE_NAME_LENGTH - ext.length) + ext;
+  }
+  return base || "unnamed";
 }
 
 function sha256Buffer(buffer: Buffer): string {
@@ -28,7 +110,44 @@ function sha256Buffer(buffer: Buffer): string {
 }
 
 function validateMimeType(mimeType: string): boolean {
-  return ALLOWED_MIME_PREFIXES.some((prefix) => mimeType.startsWith(prefix));
+  return ALLOWED_MIME_TYPES.some((allowed) =>
+    typeof allowed === "string" ? allowed === mimeType : allowed.test(mimeType)
+  );
+}
+
+function validateMagicBytes(buffer: Buffer, declaredMime: string): boolean {
+  const header = Array.from(buffer.slice(0, 64));
+
+  // SVG is text-based: skip binary magic-byte check, rely on content sniffing
+  if (declaredMime === "image/svg+xml") {
+    const text = buffer.toString("utf8", 0, 200).toLowerCase();
+    return text.includes("<svg") || (text.includes("<?xml") && text.includes("svg"));
+  }
+
+  for (const sig of FILE_SIGNATURES) {
+    if (declaredMime.startsWith(sig.mime) || sig.mime === "application/zip") {
+      for (const candidate of sig.signatures) {
+        if (typeof candidate === "function") {
+          if (candidate(header)) return true;
+        } else {
+          const matches = candidate.every((byte, i) => header[i] === byte);
+          if (matches) return true;
+        }
+      }
+    }
+  }
+
+  // Plain text / CSV: verify decodable as UTF-8 and no null bytes
+  if (declaredMime.startsWith("text/")) {
+    try {
+      const text = buffer.toString("utf8", 0, Math.min(buffer.length, 512));
+      return !text.includes("\u0000");
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
 }
 
 async function getUserContext() {
@@ -83,12 +202,17 @@ export async function uploadFile(
   }
 
   if (file.size > MAX_FILE_SIZE_BYTES) {
-    return { success: false, error: "Datei zu groß (max. 50 MB)" };
+    return { success: false, error: "Datei zu groß (max. 10 MB)" };
   }
 
   const mimeType = file.type || "application/octet-stream";
   if (!validateMimeType(mimeType)) {
     return { success: false, error: "Dateityp nicht erlaubt" };
+  }
+
+  const data = await bufferFromFile(file);
+  if (!validateMagicBytes(data, mimeType)) {
+    return { success: false, error: "Dateiinhalt stimmt nicht mit angegebenem Dateityp überein" };
   }
 
   if (options.employeeId && !hasManage) {
@@ -98,7 +222,6 @@ export async function uploadFile(
     }
   }
 
-  const data = await bufferFromFile(file);
   const checksum = sha256Buffer(data);
   const fileId = randomUUID();
   const sanitizedName = sanitizeFileName(file.name);

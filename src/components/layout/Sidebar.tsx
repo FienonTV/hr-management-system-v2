@@ -13,6 +13,7 @@ import {
   Plane,
   Trash2,
 } from "lucide-react";
+import SidebarClient from "./SidebarClient";
 
 export const ICON_MAP: Record<string, LucideIcon> = {
   LayoutDashboard,
@@ -39,5 +40,8 @@ type SidebarProps = {
   visibleItems?: SidebarItem[];
 };
 
-export { default } from "./SidebarClient";
+export default function Sidebar({ visibleItems }: SidebarProps) {
+  return <SidebarClient visibleItems={visibleItems} />;
+}
+
 export type { SidebarProps };
