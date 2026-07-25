@@ -1,8 +1,20 @@
-import { getRoles } from "@/lib/actions/roles";
+import { getRoles, deleteRole } from "@/lib/actions/roles";
 import { auth } from "@/lib/auth";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Shield, Plus, Edit, Trash2 } from "lucide-react";
+import { Shield, Plus, Edit, Trash2, CheckCircle2, XCircle } from "lucide-react";
+import { revalidatePath } from "next/cache";
+import type { Permission } from "@prisma/client";
+
+function groupPermissionsByModule(permissions: Permission[]) {
+  const map = new Map<string, Permission[]>();
+  permissions.forEach((permission) => {
+    const group = permission.module || "Sonstige";
+    if (!map.has(group)) map.set(group, []);
+    map.get(group)!.push(permission);
+  });
+  return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+}
 
 export default async function RolesPage() {
   const session = await auth();
@@ -15,6 +27,16 @@ export default async function RolesPage() {
     roles = await getRoles();
   } catch (e) {
     error = e instanceof Error ? e.message : "Fehler beim Laden der Rollen";
+  }
+
+  async function handleDelete(formData: FormData) {
+    "use server";
+    const id = formData.get("id") as string;
+    const result = await deleteRole(id);
+    if (!result.success) {
+      throw new Error(result.error || "Fehler beim Löschen");
+    }
+    revalidatePath("/dashboard/roles");
   }
 
   return (
@@ -49,46 +71,89 @@ export default async function RolesPage() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Beschreibung</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Berechtigungen</th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Admin</th>
                   <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">Aktionen</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
-                {roles.map((role) => (
-                  <tr key={role.id} className="hover:bg-gray-50">
-                    <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">{role.name}</td>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">{role.isAdmin ? "Ja" : "Nein"}</td>
-                    <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
-                      <div className="flex items-center justify-end space-x-2">
-                        <Link
-                          href={`/dashboard/roles/${role.id}`}
-                          className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-primary-600"
-                          title="Bearbeiten"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Link>
-                        {!role.isAdmin && (
-                          <form
-                            action={async () => {
-                              'use server';
-                              const { deleteRole } = await import('@/lib/actions/roles');
-                              await deleteRole(role.id);
-                            }}
-                            className="inline"
-                          >
-                            <button
-                              type="submit"
-                              className="rounded-lg p-2 text-gray-500 hover:bg-red-50 hover:text-red-600"
-                              title="Löschen"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </form>
+                {roles.map((role) => {
+                  const grouped = groupPermissionsByModule(role.permissions);
+                  return (
+                    <tr key={role.id} className="hover:bg-gray-50">
+                      <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">{role.name}</td>
+                      <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate" title={role.description || undefined}>
+                        {role.description || "-"}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-700">
+                        {role.isAdmin ? (
+                          <span className="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-800">
+                            Vollzugriff
+                          </span>
+                        ) : role.permissions.length === 0 ? (
+                          <span className="text-gray-400">Keine Berechtigungen</span>
+                        ) : (
+                          <div className="space-y-2">
+                            {grouped.map(([module, permissions]) => (
+                              <div key={module}>
+                                <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">{module}</span>
+                                <div className="mt-1 flex flex-wrap gap-1.5">
+                                  {permissions.map((permission) => (
+                                    <span
+                                      key={permission.id}
+                                      className="inline-flex items-center gap-1 rounded-md bg-primary-50 px-2 py-1 text-xs font-medium text-primary-700"
+                                      title={permission.key}
+                                    >
+                                      <CheckCircle2 className="h-3 w-3" />
+                                      {permission.description || `${permission.resource}:${permission.action}`}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+                        {role.isAdmin ? (
+                          <span className="inline-flex items-center text-purple-700">
+                            <CheckCircle2 className="mr-1 h-4 w-4" />
+                            Ja
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center text-gray-500">
+                            <XCircle className="mr-1 h-4 w-4" />
+                            Nein
+                          </span>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
+                        <div className="flex items-center justify-end space-x-2">
+                          <Link
+                            href={`/dashboard/roles/${role.id}`}
+                            className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-primary-600"
+                            title="Bearbeiten"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Link>
+                          {!role.isAdmin && (
+                            <form action={handleDelete} className="inline">
+                              <input type="hidden" name="id" value={role.id} />
+                              <button
+                                type="submit"
+                                className="rounded-lg p-2 text-gray-500 hover:bg-red-50 hover:text-red-600"
+                                title="Löschen"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </form>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

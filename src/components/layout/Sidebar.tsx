@@ -1,50 +1,41 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
   Shield,
   ClipboardList,
-  LogOut,
   UserCog,
-} from 'lucide-react';
-import { signOut } from 'next-auth/react';
+  LogOut,
+  type LucideIcon,
+} from "lucide-react";
+import { signOut } from "next-auth/react";
 
-const navigation = [
-  {
-    name: 'Dashboard',
-    href: '/dashboard',
-    icon: LayoutDashboard,
-  },
-  {
-    name: 'Mitarbeiter',
-    href: '/dashboard/employees',
-    icon: Users,
-  },
-  {
-    name: 'Rollen',
-    href: '/dashboard/roles',
-    icon: Shield,
-  },
-  {
-    name: 'Benutzer',
-    href: '/dashboard/users',
-    icon: UserCog,
-  },
-  {
-    name: 'Audit-Log',
-    href: '/dashboard/audit',
-    icon: ClipboardList,
-  },
-];
+const ICON_MAP: Record<string, LucideIcon> = {
+  LayoutDashboard,
+  Users,
+  Shield,
+  ClipboardList,
+  UserCog,
+};
 
-export default function Sidebar() {
+export type SidebarItem = {
+  name: string;
+  href: string;
+  iconKey: string;
+};
+
+type SidebarProps = {
+  visibleItems?: SidebarItem[];
+};
+
+export default function Sidebar({ visibleItems = [] }: SidebarProps) {
   const pathname = usePathname();
 
   const handleLogout = async () => {
-    await signOut({ callbackUrl: '/login' });
+    await signOut({ callbackUrl: "/login" });
   };
 
   return (
@@ -61,9 +52,11 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1 px-3 py-4">
-        {navigation.map((item) => {
-          const Icon = item.icon;
-          const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+        {visibleItems.map((item) => {
+          const Icon = ICON_MAP[item.iconKey];
+          const isActive =
+            pathname === item.href ||
+            (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"));
 
           return (
             <Link
@@ -71,11 +64,11 @@ export default function Sidebar() {
               href={item.href}
               className={`flex items-center space-x-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
                 isActive
-                  ? 'bg-primary-600 text-white'
-                  : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                  ? "bg-primary-600 text-white"
+                  : "text-gray-300 hover:bg-gray-800 hover:text-white"
               }`}
             >
-              <Icon className="h-5 w-5" />
+              {Icon && <Icon className="h-5 w-5" />}
               <span>{item.name}</span>
             </Link>
           );

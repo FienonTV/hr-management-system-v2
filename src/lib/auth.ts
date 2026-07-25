@@ -9,11 +9,18 @@ import type { User as NextAuthUser } from "next-auth";
 type AppUser = NextAuthUser & {
   id: string;
   tenantId: string;
+  externalId: string;
   isSystemAdmin: boolean;
+  forcePasswordChange: boolean;
 };
 
 function isAppUser(user: NextAuthUser): user is AppUser {
-  return "tenantId" in user && "isSystemAdmin" in user;
+  return (
+    "tenantId" in user &&
+    "externalId" in user &&
+    "isSystemAdmin" in user &&
+    "forcePasswordChange" in user
+  );
 }
 
 /**
@@ -89,6 +96,20 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
           return null;
         }
 
+        // User must be linked to an employee unless they are a system admin
+        if (!user.employeeId && !user.isSystemAdmin) {
+          await recordLoginAttempt(email, ipAddress);
+          await logAudit({
+            tenantId: tenant.id,
+            userId: user.id,
+            action: "auth.login_failed",
+            resourceType: "user",
+            resourceId: user.id,
+            metadata: { email, reason: "no_employee_link" },
+          });
+          return null;
+        }
+
         // 4. Passwort prüfen
         const isValid = await compare(password, user.passwordHash || "");
 
@@ -122,7 +143,9 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
           name: `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email,
           email: user.email,
           tenantId: user.tenantId,
+          externalId,
           isSystemAdmin: user.isSystemAdmin,
+          forcePasswordChange: user.forcePasswordChange,
         } as AppUser;
       },
     }),
@@ -132,15 +155,20 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       if (user && isAppUser(user)) {
         token.id = user.id;
         token.tenantId = user.tenantId;
+        token.externalId = user.externalId;
         token.isSystemAdmin = user.isSystemAdmin;
+        token.forcePasswordChange = user.forcePasswordChange;
       }
       return token;
     },
     async session({ session, token }) {
       if (token && session.user) {
-        session.user.id = token.id as string;
-        session.user.tenantId = token.tenantId as string;
-        session.user.isSystemAdmin = token.isSystemAdmin as boolean;
+        const appUser = session.user as unknown as AppUser;
+        appUser.id = token.id as string;
+        appUser.tenantId = token.tenantId as string;
+        appUser.externalId = token.externalId as string;
+        appUser.isSystemAdmin = token.isSystemAdmin as boolean;
+        appUser.forcePasswordChange = token.forcePasswordChange as boolean;
       }
       return session;
     },

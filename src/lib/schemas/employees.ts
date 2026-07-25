@@ -7,6 +7,8 @@ export const EmployeeSchema = z.object({
   position: z.string().optional(),
   department: z.string().optional(),
   startDate: z.string().optional(),
+  createUserAccount: z.boolean().optional(),
+  userRoleIds: z.array(z.string()).optional(),
 });
 
 export type EmployeeInput = z.infer<typeof EmployeeSchema>;

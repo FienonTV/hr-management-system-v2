@@ -35,8 +35,8 @@ export async function PATCH(
 
   try {
     const { id } = await params;
-    const { name, permissionKeys } = await req.json();
-    const result = await updateRole(id, name, permissionKeys);
+    const { name, description, permissionKeys } = await req.json();
+    const result = await updateRole(id, name, description || "", permissionKeys || []);
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }

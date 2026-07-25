@@ -8,6 +8,7 @@ export default async function middleware(req: NextRequest) {
   const isAuthPage = pathname.startsWith("/login");
   const isApiAuth = pathname.startsWith("/api/auth");
   const isStatic = pathname.startsWith("/_next") || pathname.startsWith("/favicon.ico");
+  const isChangePassword = pathname === "/change-password";
 
   if (isAuthPage || isApiAuth || isStatic) {
     return NextResponse.next();
@@ -17,6 +18,10 @@ export default async function middleware(req: NextRequest) {
 
   if (!token) {
     return NextResponse.redirect(new URL("/login", req.url));
+  }
+
+  if (token.forcePasswordChange && !isChangePassword) {
+    return NextResponse.redirect(new URL("/change-password", req.url));
   }
 
   return NextResponse.next();

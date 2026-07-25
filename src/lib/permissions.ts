@@ -19,35 +19,63 @@ async function hasAdminRole(
 }
 
 /**
+ * Returns all effective permission keys for a user in a tenant.
+ * Admin roles receive all existing permissions.
+ */
+export async function getEffectivePermissions(
+  userId: string,
+  tenantId: string
+): Promise<Set<string>> {
+  return withTenant(tenantId, async (tx) => {
+    const permissions = await tx.permission.findMany();
+
+    if (await hasAdminRole(tx, userId)) {
+      return new Set(permissions.map((p) => p.key));
+    }
+
+    const keys = new Set<string>();
+
+    const rolePermissions = await tx.rolePermission.findMany({
+      where: {
+        role: { users: { some: { userId } } },
+      },
+      include: { permission: true },
+    });
+    for (const rp of rolePermissions) {
+      keys.add(rp.permission.key);
+    }
+
+    const userPermissions = await tx.userPermission.findMany({
+      where: { userId },
+      include: { permission: true },
+    });
+    for (const up of userPermissions) {
+      if (up.granted) {
+        keys.add(up.permission.key);
+      } else {
+        keys.delete(up.permission.key);
+      }
+    }
+
+    return keys;
+  });
+}
+
+/**
  * Checks if a user has a specific permission in a tenant.
- * Admin roles implicitly have all permissions.
+ * Admin roles and system admins implicitly have all permissions.
  */
 export async function hasPermission(
   userId: string,
   tenantId: string,
   permissionKey: string
 ): Promise<boolean> {
-  return withTenant(tenantId, async (tx) => {
-    if (await hasAdminRole(tx, userId)) return true;
-
-    const rolePermissions = await tx.rolePermission.findMany({
-      where: {
-        role: { users: { some: { userId } } },
-        permission: { key: permissionKey },
-      },
-    });
-    if (rolePermissions.length > 0) return true;
-
-    const userPermission = await tx.userPermission.findFirst({
-      where: {
-        userId,
-        permission: { key: permissionKey },
-      },
-    });
-    if (userPermission) return userPermission.granted;
-
-    return false;
-  });
+  const session = await auth();
+  if (session?.user?.isSystemAdmin) {
+    return true;
+  }
+  const keys = await getEffectivePermissions(userId, tenantId);
+  return keys.has(permissionKey);
 }
 
 /**

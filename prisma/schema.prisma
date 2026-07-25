@@ -53,18 +53,21 @@ model TenantSetting {
 model User {
   id             String    @id @default(cuid())
   tenantId       String @map("tenant_id")
+  employeeId     String?   @unique @map("employee_id")
   email          String
   passwordHash   String?
   firstName      String?  @map("first_name")
   lastName       String?  @map("last_name")
   isActive       Boolean   @default(true)
   isSystemAdmin  Boolean   @default(false)
+  forcePasswordChange Boolean @default(false) @map("force_password_change")
   emailVerified  DateTime? @map("email_verified")
   lastLoginAt    DateTime? @map("last_login_at")
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
   tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee       Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
   roles          UserRole[]
   permissions    UserPermission[]
   files          File[]
@@ -72,6 +75,7 @@ model User {
 
   @@unique([tenantId, email])
   @@index([tenantId])
+  @@index([employeeId])
   @@map("users")
 }
 
@@ -266,6 +270,7 @@ model Employee {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userAccount User?
 
   @@index([tenantId])
   @@map("employees")

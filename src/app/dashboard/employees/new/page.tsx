@@ -1,13 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { createEmployee } from "@/lib/actions/employees";
+import { getRoles } from "@/lib/actions/roles";
+import { useEffect } from "react";
+
+type Role = { id: string; name: string };
 
 export default function NewEmployeePage() {
-  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [createUser, setCreateUser] = useState(false);
+  const [userRoleIds, setUserRoleIds] = useState<string[]>([]);
+  const [createdTemporaryPassword, setCreatedTemporaryPassword] = useState<string | null>(null);
+  const [createdEmployeeId, setCreatedEmployeeId] = useState<string | null>(null);
+
+  useEffect(() => {
+    getRoles().then(setRoles).catch(console.error);
+  }, []);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -23,28 +35,23 @@ export default function NewEmployeePage() {
       position: String(formData.get("position") ?? "") || undefined,
       department: String(formData.get("department") ?? "") || undefined,
       startDate: String(formData.get("startDate") ?? "") || undefined,
+      createUserAccount: createUser,
+      userRoleIds: createUser ? userRoleIds : undefined,
     };
 
     try {
-      const response = await fetch("/api/employees", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-
-      // Some error paths may return an empty body (e.g. middleware/auth).
-      const text = await response.text();
-      const result = text ? (JSON.parse(text) as { error?: string }) : {};
-
-      if (!response.ok) {
-        setError(result.error || `Fehler beim Speichern (${response.status})`);
+      const result = await createEmployee(data);
+      if (!result.success) {
+        setError(result.error || "Fehler beim Speichern");
         setLoading(false);
         return;
       }
 
+      setCreatedTemporaryPassword(result.temporaryPassword || null);
+      setCreatedEmployeeId(result.employeeId || null);
       form.reset();
-      router.push("/dashboard/employees");
-      router.refresh();
+      setCreateUser(false);
+      setUserRoleIds([]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Fehler beim Speichern");
       setLoading(false);
@@ -69,6 +76,52 @@ export default function NewEmployeePage() {
             {error}
           </div>
         )}
+
+        {createdTemporaryPassword && createdEmployeeId && (
+          <div className="rounded-md bg-green-50 border border-green-200 p-4 space-y-3">
+            <div className="flex items-start gap-2">
+              <span className="text-green-600 mt-0.5">✓</span>
+              <div className="text-sm text-green-800">
+                <p className="font-medium">Mitarbeiter und Benutzer-Account wurden angelegt.</p>
+                <p className="mt-1">Teilen Sie dem Benutzer das temporäre Passwort sicher mit. Beim ersten Login muss er ein neues Passwort setzen.</p>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-green-300 bg-white p-3">
+              <p className="text-xs font-medium text-gray-500 uppercase">Temporäres Passwort</p>
+              <div className="mt-1 flex items-center justify-between gap-3">
+                <code className="text-lg font-mono text-gray-900 break-all">{createdTemporaryPassword}</code>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (createdTemporaryPassword) {
+                      navigator.clipboard.writeText(createdTemporaryPassword);
+                    }
+                  }}
+                  className="shrink-0 rounded-md bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
+                >
+                  Kopieren
+                </button>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <Link
+                href={`/dashboard/employees/${createdEmployeeId}`}
+                className="inline-flex items-center rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 transition-colors"
+              >
+                Zur Mitarbeiter-Detailseite
+              </Link>
+              <Link
+                href="/dashboard/employees"
+                className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Zur Übersicht
+              </Link>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           <div className="space-y-2">
             <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
@@ -106,6 +159,7 @@ export default function NewEmployeePage() {
             id="email"
             name="email"
             type="email"
+            required={createUser}
             className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
             placeholder="E-Mail"
           />
@@ -148,6 +202,41 @@ export default function NewEmployeePage() {
             type="date"
             className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
+        </div>
+
+        <div className="space-y-3 rounded-lg border border-gray-200 p-4">
+          <label className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              checked={createUser}
+              onChange={(e) => setCreateUser(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+            />
+            <span className="text-sm font-medium text-gray-900">Benutzer-Account anlegen</span>
+          </label>
+
+          {createUser && (
+            <div className="pl-7">
+              <p className="mb-2 text-sm text-gray-600">Dem Benutzer wird ein temporäres Passwort zugewiesen. Eine Passwort-Reset-E-Mail ist noch nicht implementiert.</p>
+              <div className="flex flex-wrap gap-3">
+                {roles.map((role) => (
+                  <label key={role.id} className="inline-flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      value={role.id}
+                      checked={userRoleIds.includes(role.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) setUserRoleIds((ids) => [...ids, role.id]);
+                        else setUserRoleIds((ids) => ids.filter((id) => id !== role.id));
+                      }}
+                      className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    {role.name}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-200">

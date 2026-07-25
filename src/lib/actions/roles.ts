@@ -6,20 +6,29 @@ import { logAudit } from "@/lib/audit";
 import type { Role, Permission, User } from "@prisma/client";
 
 export type RoleWithPermissions = Role & {
-  permissions: (Permission & { permission: Permission })[];
+  permissions: Permission[];
 };
 
-export async function getRoles(): Promise<Role[]> {
+export async function getRoles(): Promise<RoleWithPermissions[]> {
   const { tenantId } = await requirePermission("roles:read");
   return withTenant(tenantId, async (tx) => {
-    return tx.role.findMany({
+    const roles = await tx.role.findMany({
       where: { tenantId },
       orderBy: { name: "asc" },
+      include: {
+        permissions: {
+          include: { permission: true },
+        },
+      },
     });
+    return roles.map((role) => ({
+      ...role,
+      permissions: role.permissions.map((rp) => rp.permission),
+    }));
   });
 }
 
-export async function getRoleById(id: string): Promise<(Role & { permissions: Permission[] }) | null> {
+export async function getRoleById(id: string): Promise<RoleWithPermissions | null> {
   const { tenantId } = await requirePermission("roles:read");
   return withTenant(tenantId, async (tx) => {
     const role = await tx.role.findUnique({
@@ -30,7 +39,7 @@ export async function getRoleById(id: string): Promise<(Role & { permissions: Pe
         },
       },
     });
-    if (!role) return null;
+    if (!role || role.tenantId !== tenantId) return null;
     return {
       ...role,
       permissions: role.permissions.map((rp) => rp.permission),
@@ -42,15 +51,16 @@ export async function getAllPermissions(): Promise<Permission[]> {
   const { tenantId } = await requirePermission("roles:read");
   return withTenant(tenantId, async (tx) => {
     return tx.permission.findMany({
-      orderBy: { key: "asc" },
+      orderBy: [{ module: "asc" }, { resource: "asc" }, { action: "asc" }],
     });
   });
 }
 
 export async function createRole(
   name: string,
+  description: string,
   permissionKeys: string[]
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; roleId?: string }> {
   const { tenantId, session } = await requirePermission("roles:create");
 
   if (!name.trim()) {
@@ -73,6 +83,7 @@ export async function createRole(
       data: {
         tenantId,
         name: name.trim(),
+        description: description.trim() || null,
         isAdmin: false,
         permissions: {
           create: permissions.map((p) => ({
@@ -89,16 +100,17 @@ export async function createRole(
       action: "role.create",
       resourceType: "role",
       resourceId: role.id,
-      metadata: { name: role.name, permissions: permissionKeys },
+      metadata: { name: role.name, description: role.description, permissions: permissionKeys },
     });
 
-    return { success: true };
+    return { success: true, roleId: role.id };
   });
 }
 
 export async function updateRole(
   id: string,
   name: string,
+  description: string,
   permissionKeys: string[]
 ): Promise<{ success: boolean; error?: string }> {
   const { tenantId, session } = await requirePermission("roles:update");
@@ -118,6 +130,17 @@ export async function updateRole(
       return { success: false, error: "Die Admin-Rolle kann nicht bearbeitet werden" };
     }
 
+    const nameConflict = await tx.role.findFirst({
+      where: {
+        tenantId,
+        name: name.trim(),
+        id: { not: id },
+      },
+    });
+    if (nameConflict) {
+      return { success: false, error: "Eine Rolle mit diesem Namen existiert bereits" };
+    }
+
     const permissions = await tx.permission.findMany({
       where: { key: { in: permissionKeys } },
     });
@@ -126,6 +149,7 @@ export async function updateRole(
       where: { id },
       data: {
         name: name.trim(),
+        description: description.trim() || null,
         permissions: {
           deleteMany: {},
           create: permissions.map((p) => ({
@@ -142,7 +166,7 @@ export async function updateRole(
       action: "role.update",
       resourceType: "role",
       resourceId: id,
-      metadata: { name: role.name, permissions: permissionKeys },
+      metadata: { name: role.name, description: role.description, permissions: permissionKeys },
     });
 
     return { success: true };

@@ -19,7 +19,9 @@ export type AuditAction =
   | "role.update"
   | "role.delete"
   | "user.role.assign"
-  | "user.role.remove";
+  | "user.role.remove"
+  | "user.create"
+  | "user.delete";
 
 interface LogAuditParams {
   tenantId: string;

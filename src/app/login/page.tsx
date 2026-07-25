@@ -27,20 +27,13 @@ function LoginForm() {
     const password = formData.get("password") as string;
 
     try {
-      const result = await signIn("credentials", {
+      await signIn("credentials", {
         externalId,
         email,
         password,
-        redirect: false,
+        callbackUrl: "/dashboard",
+        redirect: true,
       });
-
-      if (result?.error) {
-        setError(result.error || "Anmeldung fehlgeschlagen");
-        setLoading(false);
-      } else {
-        router.push("/dashboard");
-        router.refresh();
-      }
     } catch {
       setError("Ein unerwarteter Fehler ist aufgetreten");
       setLoading(false);

@@ -43,8 +43,8 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { name, permissionKeys } = await req.json();
-    const result = await createRole(name, permissionKeys);
+    const { name, description, permissionKeys } = await req.json();
+    const result = await createRole(name, description || "", permissionKeys || []);
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
@@ -62,11 +62,11 @@ export async function PATCH(req: NextRequest) {
   }
 
   try {
-    const { id, name, permissionKeys } = await req.json();
+    const { id, name, description, permissionKeys } = await req.json();
     if (!id) {
       return NextResponse.json({ error: "Missing id" }, { status: 400 });
     }
-    const result = await updateRole(id, name, permissionKeys);
+    const result = await updateRole(id, name, description || "", permissionKeys || []);
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }

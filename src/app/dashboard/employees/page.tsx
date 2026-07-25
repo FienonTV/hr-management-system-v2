@@ -65,6 +65,7 @@ export default async function EmployeesPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Position</th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Abteilung</th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Startdatum</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Benutzer-Account</th>
                     <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">Aktionen</th>
                   </tr>
                 </thead>
@@ -93,6 +94,17 @@ export default async function EmployeesPage() {
                         {employee.startDate
                           ? new Date(employee.startDate).toLocaleDateString("de-DE")
                           : '-'}
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+                        {('userAccount' in employee && employee.userAccount) ? (
+                          <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+                            Aktiv
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">
+                            Kein Account
+                          </span>
+                        )}
                       </td>
                       <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
                         <div className="flex items-center justify-end space-x-2">
