@@ -1,20 +1,4 @@
-import type { Employee as PrismaEmployee, EmploymentContract as PrismaContract, File as PrismaFile, Role, User } from "@prisma/client";
-
-type AddressShape = {
-  street?: string | null;
-  zip?: string | null;
-  city?: string | null;
-  country?: string | null;
-};
-
-type SensitiveDataShape = {
-  taxId?: string | null;
-  socialSecurityNumber?: string | null;
-  iban?: string | null;
-  bic?: string | null;
-  emergencyContactName?: string | null;
-  emergencyContactPhone?: string | null;
-};
+import type { Employee as PrismaEmployee, EmploymentContract as PrismaContract, File as PrismaFile, User, EmployeeDocument as PrismaEmployeeDocument } from "@prisma/client";
 
 export type Employee = Omit<PrismaEmployee, "address" | "sensitiveData"> & {
   address: unknown;
@@ -36,6 +20,8 @@ export type Employee = Omit<PrismaEmployee, "address" | "sensitiveData"> & {
 export type EmploymentContract = PrismaContract;
 
 export type FileItem = PrismaFile;
+
+export type EmployeeDocument = PrismaEmployeeDocument & { file: PrismaFile };
 
 export type RoleOption = { id: string; name: string };
 

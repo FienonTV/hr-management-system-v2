@@ -41,4 +41,3 @@ type SidebarProps = {
 
 export { default } from "./SidebarClient";
 export type { SidebarProps };
-export type { SidebarItem };
