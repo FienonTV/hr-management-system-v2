@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createUser, deleteUser } from "@/lib/actions/users";
+import { createUser, deleteUser, getUsersWithRoles } from "@/lib/actions/users";
 import { assignRoleToUser, removeRoleFromUser, getRoles } from "@/lib/actions/roles";
 import { getEmployeesWithoutUser } from "@/lib/actions/employees";
 
@@ -44,12 +44,12 @@ export default function UsersPage() {
 
   async function load() {
     try {
-      const [usersRes, rolesData, employeesData] = await Promise.all([
-        fetch("/api/users").then((r) => r.json()),
+      const [usersData, rolesData, employeesData] = await Promise.all([
+        getUsersWithRoles(),
         getRoles(),
         getEmployeesWithoutUser(),
       ]);
-      setUsers(usersRes.users || []);
+      setUsers(usersData);
       setRoles(rolesData);
       setEmployees(employeesData);
     } catch (err) {
