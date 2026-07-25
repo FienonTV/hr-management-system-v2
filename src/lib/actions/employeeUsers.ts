@@ -51,6 +51,7 @@ export async function getEmployeeUser(employeeId: string) {
       user: {
         ...user,
         roles: user.roles.map((ur) => ur.role),
+        roleIds: user.roles.map((ur) => ur.role.id),
       },
     };
   });

@@ -1,10 +1,26 @@
-import type { Employee as PrismaEmployee, EmploymentContract as PrismaContract } from "@prisma/client";
+import type { Employee as PrismaEmployee, EmploymentContract as PrismaContract, File as PrismaFile, Role, User } from "@prisma/client";
+
+type AddressShape = {
+  street?: string | null;
+  zip?: string | null;
+  city?: string | null;
+  country?: string | null;
+};
+
+type SensitiveDataShape = {
+  taxId?: string | null;
+  socialSecurityNumber?: string | null;
+  iban?: string | null;
+  bic?: string | null;
+  emergencyContactName?: string | null;
+  emergencyContactPhone?: string | null;
+};
 
 export type Employee = Omit<PrismaEmployee, "address" | "sensitiveData"> & {
   address: unknown;
   sensitiveData: unknown;
-
-  // Flattened access helpers used by the form
+  userAccount?: { id: string; email: string } | null;
+  // server flattens address/sensitiveData JSON for the form
   street?: string | null;
   zip?: string | null;
   city?: string | null;
@@ -19,15 +35,27 @@ export type Employee = Omit<PrismaEmployee, "address" | "sensitiveData"> & {
 
 export type EmploymentContract = PrismaContract;
 
-export type RoleOption = {
-  id: string;
-  name: string;
-  isAdmin: boolean;
+export type FileItem = PrismaFile;
+
+export type RoleOption = { id: string; name: string };
+
+export type EmployeeUserData = Pick<User, "id" | "tenantId" | "employeeId" | "email" | "isActive" | "createdAt" | "updatedAt" | "lastLoginAt"> & {
+  firstName: string | null;
+  lastName: string | null;
+  roles: RoleOption[];
+  roleIds: string[];
 };
 
-export type EmployeeUserData = {
-  id: string;
-  email: string;
-  isActive: boolean;
-  roles: { id: string; name: string }[];
+export type FormState = {
+  error?: string;
+  success?: string;
+};
+
+export type ContractFormData = {
+  title: string;
+  contractType: PrismaContract["contractType"];
+  startDate: string;
+  endDate?: string;
+  salaryJson?: string;
+  metadata?: string;
 };

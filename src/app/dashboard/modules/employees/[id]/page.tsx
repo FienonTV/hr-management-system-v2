@@ -19,6 +19,8 @@ import {
   X,
   Mail,
   RefreshCw,
+  Upload,
+  Download,
 } from "lucide-react";
 import {
   getEmployeeById,
@@ -38,11 +40,12 @@ import {
   getAssignableRoles,
 } from "@/lib/actions/employeeUsers";
 import { createInvitation } from "@/lib/actions/invitations";
+import { listFiles, deleteFile } from "@/lib/actions/files";
 
-import type { Employee, EmploymentContract, RoleOption, EmployeeUserData } from "./types";
+import type { Employee, EmploymentContract, RoleOption, EmployeeUserData, FileItem } from "./types";
 import type { EmploymentContractInput } from "@/lib/schemas/employees";
 
-type Tab = "stammdaten" | "vertraege" | "user";
+type Tab = "stammdaten" | "vertraege" | "dokumente" | "user";
 
 function toDateInputValue(date: string | Date | null | undefined): string {
   if (!date) return "";
@@ -55,6 +58,7 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
   const router = useRouter();
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [contracts, setContracts] = useState<EmploymentContract[]>([]);
+  const [files, setFiles] = useState<FileItem[]>([]);
   const [activeTab, setActiveTab] = useState<Tab>("stammdaten");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +77,8 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
           if (empData) {
             setEmployee(empData);
             setContracts(contractData);
+            const fileResult = await listFiles({ employeeId: id, limit: 100 });
+            setFiles(fileResult.files);
           } else {
             setError("Mitarbeiter nicht gefunden");
           }
@@ -183,6 +189,7 @@ const stringFields = [
   const tabs = [
     { id: "stammdaten" as Tab, label: "Stammdaten", icon: FileText },
     { id: "vertraege" as Tab, label: "Verträge", icon: Briefcase },
+    { id: "dokumente" as Tab, label: "Dokumente", icon: FileText },
     { id: "user" as Tab, label: "Benutzer-Account", icon: ShieldCheck },
   ];
 
@@ -344,6 +351,10 @@ const stringFields = [
 
       {activeTab === "vertraege" && (
         <ContractsTab employeeId={employee.id} contracts={contracts} onChange={setContracts} />
+      )}
+
+      {activeTab === "dokumente" && (
+        <DocumentsTab employeeId={employee.id} files={files} onChange={setFiles} />
       )}
 
       {activeTab === "user" && (
@@ -799,6 +810,177 @@ function UserTab({ employeeId, email }: { employeeId: string; email: string | nu
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function DocumentsTab({
+  employeeId,
+  files,
+  onChange,
+}: {
+  employeeId: string;
+  files: FileItem[];
+  onChange: (files: FileItem[]) => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleUpload(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setUploading(true);
+    setError(null);
+
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    formData.append("employeeId", employeeId);
+    formData.append("parentType", "employee");
+    formData.append("parentId", employeeId);
+
+    try {
+      const response = await fetch("/api/files", {
+        method: "POST",
+        body: formData,
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        setError(result.error || "Upload fehlgeschlagen");
+        return;
+      }
+
+      form.reset();
+      const updated = await listFiles({ employeeId, limit: 100 });
+      onChange(updated.files);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload fehlgeschlagen");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleDelete(fileId: string) {
+    if (!confirm("Datei wirklich in den Papierkorb verschieben?")) return;
+    const result = await deleteFile(fileId);
+    if (!result.success) {
+      setError(result.error || "Löschen fehlgeschlagen");
+      return;
+    }
+    const updated = await listFiles({ employeeId, limit: 100 });
+    onChange(updated.files);
+  }
+
+  function formatBytes(bytes: number): string {
+    if (bytes === 0) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  }
+
+  return (
+    <div className="space-y-6">
+      <form onSubmit={handleUpload} className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm space-y-4">
+        <h3 className="text-lg font-medium text-gray-900">Dokument hochladen</h3>
+        {error && <div className="rounded-md bg-red-50 p-4 text-sm text-red-600">{error}</div>}
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="space-y-2 sm:col-span-2">
+            <label htmlFor="file" className="block text-sm font-medium text-gray-700">
+              Datei
+            </label>
+            <input
+              id="file"
+              name="file"
+              type="file"
+              required
+              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 file:mr-4 file:rounded-md file:border-0 file:bg-primary-50 file:px-3 file:py-1 file:text-sm file:font-medium file:text-primary-700 hover:file:bg-primary-100"
+            />
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="category" className="block text-sm font-medium text-gray-700">
+              Kategorie
+            </label>
+            <select
+              id="category"
+              name="category"
+              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="OTHER">Sonstiges</option>
+              <option value="CONTRACT">Vertrag</option>
+              <option value="PAYSLIP">Lohnabrechnung</option>
+              <option value="DOCUMENT">Dokument</option>
+              <option value="CERTIFICATE">Bescheinigung</option>
+              <option value="AVATAR">Avatar</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label htmlFor="expiresAt" className="block text-sm font-medium text-gray-700">
+            Ablaufdatum (optional)
+          </label>
+          <input
+            id="expiresAt"
+            name="expiresAt"
+            type="date"
+            className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 sm:w-64"
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={uploading}
+          className="flex items-center space-x-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+        >
+          <Upload className="h-4 w-4" />
+          <span>{uploading ? "Wird hochgeladen..." : "Hochladen"}</span>
+        </button>
+      </form>
+
+      <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+        <h3 className="text-lg font-medium text-gray-900">Dokumente</h3>
+        {files.length === 0 ? (
+          <p className="mt-4 text-sm text-gray-500">Noch keine Dokumente vorhanden.</p>
+        ) : (
+          <ul className="mt-4 divide-y divide-gray-200">
+            {files.map((file) => (
+              <li key={file.id} className="flex items-center justify-between py-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-gray-900">{file.originalName}</p>
+                  <p className="text-xs text-gray-500">
+                    {file.category} · {formatBytes(file.sizeBytes)} ·{" "}
+                    {new Date(file.createdAt).toLocaleDateString("de-DE")}
+                    {file.expiresAt && (
+                      <span className="ml-2 inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800">
+                        Läuft ab am {new Date(file.expiresAt).toLocaleDateString("de-DE")}
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <div className="ml-4 flex items-center space-x-2">
+                  <a
+                    href={`/api/files/${file.id}`}
+                    download
+                    className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-primary-600"
+                    title="Herunterladen"
+                  >
+                    <Download className="h-4 w-4" />
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(file.id)}
+                    className="rounded-lg p-2 text-gray-500 hover:bg-red-50 hover:text-red-600"
+                    title="Löschen"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }
