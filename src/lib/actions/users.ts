@@ -99,7 +99,7 @@ export async function createUser(data: unknown): Promise<{ success: boolean; err
       metadata: { email: user.email, employeeId: employee.id },
     });
 
-    revalidatePath("/dashboard/users");
+    revalidatePath("/dashboard/modules/users");
     return { success: true };
   });
 }
@@ -126,7 +126,7 @@ export async function deleteUser(id: string): Promise<{ success: boolean; error?
       metadata: { email: user.email },
     });
 
-    revalidatePath("/dashboard/users");
+    revalidatePath("/dashboard/modules/users");
     return { success: true };
   });
 }

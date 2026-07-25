@@ -1,10 +1,10 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   binaryTargets = ["native"]
 }
 
 datasource db {
-  provider  = "postgresql"
+  provider = "postgresql"
 }
 
 // ------------------------------------------------------------------
@@ -12,35 +12,40 @@ datasource db {
 // ------------------------------------------------------------------
 
 model Tenant {
-  id          String   @id @default(cuid())
-  name        String
-  slug        String   @unique
-  externalId  String   @unique // Firmen-ID fürs Login
-  logoUrl     String?
-  isActive    Boolean  @default(true)
-  isDeleted   Boolean  @default(false)
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id         String   @id @default(cuid())
+  name       String
+  slug       String   @unique
+  externalId String   @unique // Firmen-ID fürs Login
+  logoUrl    String?
+  isActive   Boolean  @default(true)
+  isDeleted  Boolean  @default(false)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
-  users       User[]
-  settings    TenantSetting[]
-  modules     TenantModule[]
-  files       File[]
-  auditLogs   AuditLog[]
-  roles       Role[]
-  employees   Employee[]
-
+  users               User[]
+  settings            TenantSetting[]
+  modules             TenantModule[]
+  files               File[]
+  auditLogs           AuditLog[]
+  roles               Role[]
+  employees           Employee[]
+  invitationTokens    InvitationToken[]
+  employmentContracts EmploymentContract[]
+  employeeDocuments   EmployeeDocument[]
 
   @@map("tenants")
 }
 
 model TenantSetting {
-  id        String @id @default(cuid())
-  tenantId  String @map("tenant_id")
-  key       String
-  value     String
+  id          String   @id @default(cuid())
+  tenantId    String   @map("tenant_id")
+  key         String
+  value       String
+  updatedById String?  @map("updated_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
-  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, key])
   @@map("tenant_settings")
@@ -51,27 +56,27 @@ model TenantSetting {
 // ------------------------------------------------------------------
 
 model User {
-  id             String    @id @default(cuid())
-  tenantId       String @map("tenant_id")
-  employeeId     String?   @unique @map("employee_id")
-  email          String
-  passwordHash   String?
-  firstName      String?  @map("first_name")
-  lastName       String?  @map("last_name")
-  isActive       Boolean   @default(true)
-  isSystemAdmin  Boolean   @default(false)
-  forcePasswordChange Boolean @default(false) @map("force_password_change")
-  emailVerified  DateTime? @map("email_verified")
-  lastLoginAt    DateTime? @map("last_login_at")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
+  id                  String    @id @default(cuid())
+  tenantId            String    @map("tenant_id")
+  employeeId          String?   @unique @map("employee_id")
+  email               String
+  passwordHash        String?
+  firstName           String?   @map("first_name")
+  lastName            String?   @map("last_name")
+  isActive            Boolean   @default(true)
+  isSystemAdmin       Boolean   @default(false)
+  forcePasswordChange Boolean   @default(false) @map("force_password_change")
+  emailVerified       DateTime? @map("email_verified")
+  lastLoginAt         DateTime? @map("last_login_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
 
-  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  employee       Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
-  roles          UserRole[]
-  permissions    UserPermission[]
-  files          File[]
-  auditLogs      AuditLog[]
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee    Employee?        @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  roles       UserRole[]
+  permissions UserPermission[]
+  files       File[]
+  auditLogs   AuditLog[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -84,15 +89,15 @@ model User {
 // ------------------------------------------------------------------
 
 model Role {
-  id          String @id @default(cuid())
-  tenantId    String @map("tenant_id")
+  id          String   @id @default(cuid())
+  tenantId    String   @map("tenant_id")
   name        String
   description String?
-  isDefault   Boolean @default(false)
-  isAdmin     Boolean @default(false)
+  isDefault   Boolean  @default(false)
+  isAdmin     Boolean  @default(false)
   createdAt   DateTime @default(now()) @map("created_at")
 
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   permissions RolePermission[]
   users       UserRole[]
 
@@ -102,8 +107,8 @@ model Role {
 }
 
 model Permission {
-  id          String @id @default(cuid())
-  key         String @unique
+  id          String   @id @default(cuid())
+  key         String   @unique
   module      String
   resource    String
   action      String
@@ -122,8 +127,8 @@ model RolePermission {
   roleId       String @map("role_id")
   permissionId String @map("permission_id")
 
-  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, roleId, permissionId])
   @@index([tenantId])
@@ -138,8 +143,8 @@ model UserRole {
   userId   String @map("user_id")
   roleId   String @map("role_id")
 
-  user     User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role     Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, userId, roleId])
   @@index([tenantId])
@@ -147,14 +152,14 @@ model UserRole {
 }
 
 model UserPermission {
-  id           String @id @default(cuid())
-  tenantId     String @map("tenant_id")
-  userId       String @map("user_id")
-  permissionId String @map("permission_id")
+  id           String  @id @default(cuid())
+  tenantId     String  @map("tenant_id")
+  userId       String  @map("user_id")
+  permissionId String  @map("permission_id")
   granted      Boolean @default(true)
 
-  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, userId, permissionId])
   @@index([tenantId])
@@ -165,26 +170,57 @@ model UserPermission {
 // CORE: Files
 // ------------------------------------------------------------------
 
-model File {
-  id            String   @id @default(cuid())
-  tenantId      String @map("tenant_id")
-  uploadedById  String? @map("uploaded_by_id")
-  originalName  String
-  storageKey    String   @unique
-  mimeType      String
-  sizeBytes     Int
-  checksum      String?
-  isPublic      Boolean  @default(false)
-  expiresAt     DateTime?
-  metadata      Json?
-  createdAt     DateTime @default(now()) @map("created_at")
+enum FileCategory {
+  AVATAR
+  CONTRACT
+  PAYSLIP
+  DOCUMENT
+  CERTIFICATE
+  OTHER
 
-  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  uploadedBy    User?    @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  @@map("file_category")
+}
+
+model File {
+  id              String       @id @default(cuid())
+  tenantId        String       @map("tenant_id")
+  employeeId      String?      @map("employee_id")
+  uploadedById    String?      @map("uploaded_by_id")
+  originalName    String
+  storageKey      String       @unique
+  mimeType        String
+  sizeBytes       Int
+  checksum        String?
+  isPublic        Boolean      @default(false)
+  expiresAt       DateTime?
+  metadata        Json?
+  category        FileCategory @default(OTHER)
+  parentType      String?      @map("parent_type") // e.g. "employee", "tenant", "contract"
+  parentId        String?      @map("parent_id")
+  version         Int          @default(1)
+  versionOfId     String?      @map("version_of_id") // points to the first/original file id
+  isLatestVersion Boolean      @default(true) @map("is_latest_version")
+  isDeleted       Boolean      @default(false)
+  deletedAt       DateTime?    @map("deleted_at")
+  deletedById     String?      @map("deleted_by_id")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  uploadedBy        User?              @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  employee          Employee?          @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  versions          File[]             @relation("FileVersions")
+  versionOf         File?              @relation("FileVersions", fields: [versionOfId], references: [id], onDelete: SetNull)
+  employeeDocuments EmployeeDocument[]
 
   @@index([tenantId])
   @@index([tenantId, storageKey])
   @@index([tenantId, uploadedById])
+  @@index([tenantId, employeeId])
+  @@index([tenantId, parentType, parentId])
+  @@index([tenantId, category])
+  @@index([versionOfId])
+  @@index([tenantId, isDeleted])
   @@map("files")
 }
 
@@ -193,19 +229,19 @@ model File {
 // ------------------------------------------------------------------
 
 model AuditLog {
-  id            String   @id @default(cuid())
-  tenantId      String @map("tenant_id")
-  userId        String? @map("user_id")
-  action        String
-  resourceType  String
-  resourceId    String?
-  metadata      Json?
-  ipAddress     String?
-  userAgent     String?
-  createdAt     DateTime @default(now()) @map("created_at")
+  id           String   @id @default(cuid())
+  tenantId     String   @map("tenant_id")
+  userId       String?  @map("user_id")
+  action       String
+  resourceType String
+  resourceId   String?
+  metadata     Json?
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime @default(now()) @map("created_at")
 
-  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, createdAt])
   @@index([userId])
@@ -217,13 +253,13 @@ model AuditLog {
 // ------------------------------------------------------------------
 
 model ModuleDefinition {
-  id            String   @id @default(cuid())
-  key           String   @unique
-  name          String
-  description   String?
-  version       String   @default("1.0.0")
-  isCore        Boolean  @default(false)
-  createdAt     DateTime @default(now()) @map("created_at")
+  id          String   @id @default(cuid())
+  key         String   @unique
+  name        String
+  description String?
+  version     String   @default("1.0.0")
+  isCore      Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
 
   tenantModules TenantModule[]
 
@@ -231,16 +267,16 @@ model ModuleDefinition {
 }
 
 model TenantModule {
-  id        String @id @default(cuid())
-  tenantId  String @map("tenant_id")
-  moduleId  String @map("module_id")
-  isActive  Boolean @default(true)
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  moduleId  String   @map("module_id")
+  isActive  Boolean  @default(true)
   config    Json?
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  module    ModuleDefinition @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  tenant Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  module ModuleDefinition @relation(fields: [moduleId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, moduleId])
   @@map("tenant_modules")
@@ -257,22 +293,161 @@ model LoginAttempt {
   @@map("login_attempts")
 }
 
+// ------------------------------------------------------------------
+// MODULE: Employees
+// ------------------------------------------------------------------
+
+enum EmploymentStatus {
+  ACTIVE
+  INACTIVE
+  ONBOARDING
+  TERMINATED
+
+  @@map("employment_status")
+}
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  FREELANCE
+  INTERN
+  APPRENTICE
+
+  @@map("employment_type")
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  DIVERSE
+  NOT_SPECIFIED
+
+  @@map("gender")
+}
+
 model Employee {
-  id          String   @id @default(cuid())
-  tenantId    String   @map("tenant_id")
-  firstName   String   @map("first_name")
-  lastName    String   @map("last_name")
-  email       String?
-  position    String?
-  department  String?
-  startDate   DateTime? @map("start_date")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id             String           @id @default(cuid())
+  tenantId       String           @map("tenant_id")
+  employeeNumber String?          @map("employee_number")
+  firstName      String           @map("first_name")
+  lastName       String           @map("last_name")
+  email          String?
+  phone          String?
+  position       String?
+  department     String?
+  employmentType EmploymentType?  @map("employment_type")
+  status         EmploymentStatus @default(ACTIVE)
+  birthDate      DateTime?        @map("birth_date")
+  gender         Gender           @default(NOT_SPECIFIED)
+  startDate      DateTime?        @map("start_date")
+  exitDate       DateTime?        @map("exit_date")
+  address        Json?
+  sensitiveData  Json?            @map("sensitive_data") // taxId, socialSecurity, iban, bic, emergencyContact etc.
+  notes          String?
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
 
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant      Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   userAccount User?
+  contracts   EmploymentContract[]
+  files       File[]
+  documents   EmployeeDocument[]
 
+  @@unique([tenantId, employeeNumber])
   @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, department])
+  @@index([tenantId, lastName])
   @@map("employees")
 }
 
+enum ContractType {
+  PERMANENT
+  FIXED_TERM
+  MINIJOB
+  WORKER
+
+  @@map("contract_type")
+}
+
+model EmploymentContract {
+  id           String       @id @default(cuid())
+  tenantId     String       @map("tenant_id")
+  employeeId   String       @map("employee_id")
+  title        String
+  contractType ContractType @map("contract_type")
+  startDate    DateTime     @map("start_date")
+  endDate      DateTime?    @map("end_date")
+  weeklyHours  Float?       @map("weekly_hours")
+  salaryJson   String?      @map("salary_json")
+  notes        String?
+  isDeleted    Boolean      @default(false)
+  deletedAt    DateTime?    @map("deleted_at")
+  deletedById  String?      @map("deleted_by_id")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, employeeId])
+  @@map("employment_contracts")
+}
+
+model EmployeeDocument {
+  id           String    @id @default(cuid())
+  tenantId     String    @map("tenant_id")
+  employeeId   String    @map("employee_id")
+  fileId       String    @map("file_id")
+  documentType String    @map("document_type")
+  validFrom    DateTime? @map("valid_from")
+  validUntil   DateTime? @map("valid_until")
+  notes        String?
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  file     File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, employeeId, fileId])
+  @@index([tenantId, employeeId])
+  @@index([tenantId, documentType])
+  @@map("employee_documents")
+}
+
+// ------------------------------------------------------------------
+// MODULE: Invitations
+// ------------------------------------------------------------------
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+
+  @@map("invitation_status")
+}
+
+model InvitationToken {
+  id          String           @id @default(cuid())
+  tenantId    String           @map("tenant_id")
+  email       String
+  roleIds     String[]         @map("role_ids")
+  invitedById String?          @map("invited_by_id")
+  employeeId  String?          @map("employee_id")
+  tokenHash   String           @map("token_hash") // bcrypt hash of the random token
+  expiresAt   DateTime         @map("expires_at")
+  status      InvitationStatus @default(PENDING)
+  metadata    Json?
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, tokenHash])
+  @@index([tenantId, email, status])
+  @@index([tenantId, status])
+  @@map("invitation_tokens")
+}

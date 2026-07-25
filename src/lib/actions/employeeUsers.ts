@@ -4,8 +4,8 @@ import { withTenant } from "@/lib/db/tenant";
 import { requirePermission } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
-import bcrypt from "bcryptjs";
 import { z } from "zod";
+import { hashPassword, generateTemporaryPassword } from "@/lib/passwordPolicy";
 
 const CreateEmployeeUserSchema = z.object({
   employeeId: z.string().min(1),
@@ -18,10 +18,6 @@ const UpdateEmployeeUserSchema = z.object({
   roleIds: z.array(z.string()).optional(),
   isActive: z.boolean().optional(),
 });
-
-function generateTempPassword() {
-  return Math.random().toString(36).slice(-10);
-}
 
 export async function getEmployeeUser(employeeId: string) {
   const { tenantId } = await requirePermission("users:read");
@@ -88,8 +84,8 @@ export async function createEmployeeUser(
       return { success: false, error: "Dieser Mitarbeiter hat bereits einen Benutzer-Account" };
     }
 
-    const tempPassword = generateTempPassword();
-    const passwordHash = await bcrypt.hash(tempPassword, 12);
+    const tempPassword = generateTemporaryPassword();
+    const passwordHash = await hashPassword(tempPassword);
 
     const user = await tx.user.create({
       data: {
@@ -124,7 +120,7 @@ export async function createEmployeeUser(
       metadata: { email: user.email, employeeId: employee.id, via: "employee.user.create" },
     });
 
-    revalidatePath(`/dashboard/employees/${employee.id}`);
+    revalidatePath(`/dashboard/modules/employees/${employee.id}`);
     return { success: true, user: { id: user.id, email: user.email }, tempPassword };
   });
 }
@@ -180,7 +176,7 @@ export async function updateEmployeeUser(
       metadata: { email: user.email, employeeId: employee.id },
     });
 
-    revalidatePath(`/dashboard/employees/${employee.id}`);
+    revalidatePath(`/dashboard/modules/employees/${employee.id}`);
     return {
       success: true,
       user: {
@@ -211,8 +207,8 @@ export async function resetEmployeeUserPassword(
       return { success: false, error: "Dieser Mitarbeiter hat keinen Benutzer-Account" };
     }
 
-    const tempPassword = generateTempPassword();
-    const passwordHash = await bcrypt.hash(tempPassword, 12);
+    const tempPassword = generateTemporaryPassword();
+    const passwordHash = await hashPassword(tempPassword);
 
     await tx.user.update({
       where: { id: user.id },
@@ -264,7 +260,7 @@ export async function deleteEmployeeUser(employeeId: string): Promise<{ success:
       metadata: { email: user.email, employeeId: employee.id },
     });
 
-    revalidatePath(`/dashboard/employees/${employee.id}`);
+    revalidatePath(`/dashboard/modules/employees/${employee.id}`);
     return { success: true };
   });
 }

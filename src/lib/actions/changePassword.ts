@@ -4,6 +4,7 @@ import { prismaAdmin } from "@/lib/db/prisma";
 import { auth } from "@/lib/auth";
 import { hash } from "bcryptjs";
 import { logAudit } from "@/lib/audit";
+import { validatePassword, hashPassword } from "@/lib/passwordPolicy";
 import { revalidatePath } from "next/cache";
 
 export async function changePassword(
@@ -30,7 +31,12 @@ export async function changePassword(
     return { success: false, error: "Aktuelles Passwort ist falsch" };
   }
 
-  const passwordHash = await bcrypt.hash(newPassword, 12);
+  const passwordCheck = validatePassword(newPassword);
+  if (!passwordCheck.valid) {
+    return { success: false, error: passwordCheck.errors.join(" ") };
+  }
+
+  const passwordHash = await hashPassword(newPassword);
 
   await prismaAdmin.user.update({
     where: { id: user.id },

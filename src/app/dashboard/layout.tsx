@@ -1,11 +1,12 @@
 ﻿import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { SessionProvider } from "next-auth/react";
-import Sidebar, { type SidebarItem } from "@/components/layout/Sidebar";
+import Sidebar from "@/components/layout/Sidebar";
 import Header from "@/components/layout/Header";
 import { getEffectivePermissions } from "@/lib/permissions";
 import { getEffectiveTenantId } from "@/lib/session";
-import { SIDEBAR_ITEMS } from "@/lib/sidebar";
+import { buildSidebarItems } from "@/modules";
+import { getActiveModuleKeys } from "@/lib/actions/modules";
 
 export default async function DashboardLayout({
   children,
@@ -18,11 +19,12 @@ export default async function DashboardLayout({
   }
 
   const tenantId = getEffectiveTenantId(session);
-  const effectivePermissions = await getEffectivePermissions(session.user.id, tenantId);
+  const [effectivePermissions, activeModuleKeys] = await Promise.all([
+    getEffectivePermissions(session.user.id, tenantId),
+    getActiveModuleKeys(tenantId),
+  ]);
 
-  const visibleItems: SidebarItem[] = SIDEBAR_ITEMS
-    .filter((item) => item.requiredPermissions.length === 0 || item.requiredPermissions.every((p) => effectivePermissions.has(p)))
-    .map(({ name, href, iconKey }) => ({ name, href, iconKey }));
+  const visibleItems = buildSidebarItems(activeModuleKeys, effectivePermissions);
 
   return (
     <SessionProvider session={session}>

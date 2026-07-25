@@ -165,7 +165,7 @@ export default function RoleForm({
         </div>
         <div className="flex items-center space-x-3">
           <Link
-            href="/dashboard/roles"
+            href="/dashboard/modules/roles"
             className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
           >
             Abbrechen

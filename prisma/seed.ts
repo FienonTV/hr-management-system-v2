@@ -28,7 +28,7 @@ async function main() {
     },
   });
 
-  const hashedPassword = await bcrypt.hash('admin123', 12);
+  const hashedPassword = await bcrypt.hash('admin12345!', 12);
 
   await prisma.user.upsert({
     where: {
@@ -52,11 +52,21 @@ async function main() {
     { key: 'employees:create', module: 'employees', resource: 'employee', action: 'create', description: 'Mitarbeiter erstellen' },
     { key: 'employees:update', module: 'employees', resource: 'employee', action: 'update', description: 'Mitarbeiter bearbeiten' },
     { key: 'employees:delete', module: 'employees', resource: 'employee', action: 'delete', description: 'Mitarbeiter löschen' },
+    { key: 'employees:invite', module: 'employees', resource: 'employee', action: 'invite', description: 'Mitarbeiter einladen' },
     { key: 'roles:read', module: 'roles', resource: 'role', action: 'read', description: 'Rollen anzeigen' },
     { key: 'roles:create', module: 'roles', resource: 'role', action: 'create', description: 'Rollen erstellen' },
     { key: 'roles:update', module: 'roles', resource: 'role', action: 'update', description: 'Rollen bearbeiten' },
     { key: 'roles:delete', module: 'roles', resource: 'role', action: 'delete', description: 'Rollen löschen' },
     { key: 'audit:read', module: 'audit', resource: 'auditLog', action: 'read', description: 'Audit-Log anzeigen' },
+    { key: 'files:read', module: 'files', resource: 'file', action: 'read', description: 'Dateien anzeigen' },
+    { key: 'files:create', module: 'files', resource: 'file', action: 'create', description: 'Dateien hochladen' },
+    { key: 'files:delete', module: 'files', resource: 'file', action: 'delete', description: 'Dateien löschen' },
+    { key: 'documents:read', module: 'documents', resource: 'document', action: 'read', description: 'Dokumente anzeigen' },
+    { key: 'documents:create', module: 'documents', resource: 'document', action: 'create', description: 'Dokumente erstellen' },
+    { key: 'documents:delete', module: 'documents', resource: 'document', action: 'delete', description: 'Dokumente löschen' },
+    { key: 'settings:read', module: 'settings', resource: 'tenantSetting', action: 'read', description: 'Einstellungen anzeigen' },
+    { key: 'settings:update', module: 'settings', resource: 'tenantSetting', action: 'update', description: 'Einstellungen bearbeiten' },
+    { key: 'modules:manage', module: 'modules', resource: 'module', action: 'manage', description: 'Module verwalten' },
   ];
 
   const permissions = await Promise.all(

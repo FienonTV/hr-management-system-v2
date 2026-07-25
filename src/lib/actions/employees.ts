@@ -3,11 +3,69 @@
 import { withTenant } from "@/lib/db/tenant";
 import { requirePermission } from "@/lib/permissions";
 import { revalidatePath } from 'next/cache';
-import { Employee, User } from "@prisma/client";
-import { EmployeeSchema } from "@/lib/schemas/employees";
-import type { EmployeeInput } from "@/lib/schemas/employees";
+import type { Employee, User } from "@prisma/client";
+import {
+  createEmployeeSchema,
+  updateEmployeeSchema,
+  employmentContractSchema,
+  parseCreateEmployeeInput,
+  parseUpdateEmployeeInput,
+} from "@/lib/schemas/employees";
+import type { EmployeeBaseInput, CreateEmployeeInput, UpdateEmployeeInput, EmploymentContractInput } from "@/lib/schemas/employees";
 import { logAudit } from "@/lib/audit";
-import bcrypt from 'bcryptjs';
+import { hashPassword, generateTemporaryPassword } from "@/lib/passwordPolicy";
+
+function normalizeCreateEmployeeInput(data: CreateEmployeeInput): CreateEmployeeInput {
+  return normalizeEmployeeInput(data) as CreateEmployeeInput;
+}
+
+function normalizeUpdateEmployeeInput(data: UpdateEmployeeInput): UpdateEmployeeInput {
+  return normalizeEmployeeInput(data) as UpdateEmployeeInput;
+}
+
+function normalizeEmployeeInput(data: EmployeeBaseInput | Partial<EmployeeBaseInput>): EmployeeBaseInput | Partial<EmployeeBaseInput> {
+  const addressFields: (keyof EmployeeBaseInput)[] = ["street", "zip", "city", "country"];
+  const sensitiveFields: (keyof EmployeeBaseInput)[] = ["taxId", "socialSecurityNumber", "iban", "bic", "emergencyContactName", "emergencyContactPhone"];
+
+  const base = data as EmployeeBaseInput;
+
+  const hasAddressField = addressFields.some((key) => base[key] !== undefined);
+  const hasSensitiveField = sensitiveFields.some((key) => base[key] !== undefined);
+
+  const address = hasAddressField
+    ? {
+        street: base.street ?? base.address?.street,
+        zip: base.zip ?? base.address?.zip,
+        city: base.city ?? base.address?.city,
+        country: base.country ?? base.address?.country,
+      }
+    : base.address;
+
+  const sensitiveData = hasSensitiveField
+    ? {
+        taxId: base.taxId ?? base.sensitiveData?.taxId,
+        socialSecurityNumber: base.socialSecurityNumber ?? base.sensitiveData?.socialSecurityNumber,
+        iban: base.iban ?? base.sensitiveData?.iban,
+        bic: base.bic ?? base.sensitiveData?.bic,
+        emergencyContactName: base.emergencyContactName ?? base.sensitiveData?.emergencyContactName,
+        emergencyContactPhone: base.emergencyContactPhone ?? base.sensitiveData?.emergencyContactPhone,
+      }
+    : base.sensitiveData;
+
+  const normalized: EmployeeBaseInput | Partial<EmployeeBaseInput> = { ...data };
+
+  for (const key of addressFields) {
+    delete (normalized as Record<string, unknown>)[key as string];
+  }
+  for (const key of sensitiveFields) {
+    delete (normalized as Record<string, unknown>)[key as string];
+  }
+
+  if (address) (normalized as EmployeeBaseInput).address = address as EmployeeBaseInput["address"];
+  if (sensitiveData) (normalized as EmployeeBaseInput).sensitiveData = sensitiveData as EmployeeBaseInput["sensitiveData"];
+
+  return normalized;
+}
 
 export async function getEmployees(): Promise<(Employee & { userAccount?: User | null })[]> {
   const { tenantId } = await requirePermission("employees:read");
@@ -23,10 +81,29 @@ export async function getEmployees(): Promise<(Employee & { userAccount?: User |
 export async function getEmployeeById(id: string): Promise<(Employee & { userAccount?: User | null }) | null> {
   const { tenantId } = await requirePermission("employees:read");
   return withTenant(tenantId, async (tx) => {
-    return await tx.employee.findUnique({
+    const employee = await tx.employee.findUnique({
       where: { id },
       include: { userAccount: true },
     });
+    if (!employee) return null;
+
+    // Flatten JSON address/sensitiveData fields for the UI form.
+    const address = employee.address as Record<string, string | null | undefined> | null | undefined;
+    const sensitiveData = employee.sensitiveData as Record<string, string | null | undefined> | null | undefined;
+
+    return {
+      ...employee,
+      street: address?.street ?? null,
+      zip: address?.zip ?? null,
+      city: address?.city ?? null,
+      country: address?.country ?? null,
+      taxId: sensitiveData?.taxId ?? null,
+      socialSecurityNumber: sensitiveData?.socialSecurityNumber ?? null,
+      iban: sensitiveData?.iban ?? null,
+      bic: sensitiveData?.bic ?? null,
+      emergencyContactName: sensitiveData?.emergencyContactName ?? null,
+      emergencyContactPhone: sensitiveData?.emergencyContactPhone ?? null,
+    };
   });
 }
 
@@ -36,6 +113,7 @@ export async function getEmployeesWithoutUser(): Promise<Employee[]> {
     return await tx.employee.findMany({
       where: {
         tenantId,
+        status: { not: "TERMINATED" },
         userAccount: { is: null },
       },
       orderBy: { lastName: 'asc' },
@@ -43,10 +121,11 @@ export async function getEmployeesWithoutUser(): Promise<Employee[]> {
   });
 }
 
-export async function createEmployee(data: EmployeeInput): Promise<{ success: boolean; error?: string; employeeId?: string; temporaryPassword?: string }> {
+export async function createEmployee(data: CreateEmployeeInput): Promise<{ success: boolean; error?: string; employeeId?: string; temporaryPassword?: string }> {
   const { tenantId, session } = await requirePermission("employees:create");
-  const validated = EmployeeSchema.parse(data);
-  const { startDate, createUserAccount, userRoleIds, ...employeeData } = validated;
+  const normalized = normalizeCreateEmployeeInput(data);
+  const validated = parseCreateEmployeeInput(normalized);
+  const { createUserAccount, userRoleIds, ...employeeData } = validated;
 
   return withTenant(tenantId, async (tx) => {
     if (employeeData.email) {
@@ -58,10 +137,18 @@ export async function createEmployee(data: EmployeeInput): Promise<{ success: bo
       }
     }
 
+    if (employeeData.employeeNumber) {
+      const numberConflict = await tx.employee.findFirst({
+        where: { tenantId, employeeNumber: employeeData.employeeNumber },
+      });
+      if (numberConflict) {
+        return { success: false, error: "Diese Mitarbeiternummer existiert bereits" };
+      }
+    }
+
     const employee = await tx.employee.create({
       data: {
         ...employeeData,
-        startDate: startDate ? new Date(startDate) : null,
         tenantId,
       },
     });
@@ -76,8 +163,8 @@ export async function createEmployee(data: EmployeeInput): Promise<{ success: bo
         return { success: false, error: "Ein Benutzer mit dieser E-Mail existiert bereits" };
       }
 
-      temporaryPassword = Math.random().toString(36).slice(-10);
-      const passwordHash = await bcrypt.hash(temporaryPassword, 12);
+      temporaryPassword = generateTemporaryPassword();
+      const passwordHash = await hashPassword(temporaryPassword);
 
       user = await tx.user.create({
         data: {
@@ -95,7 +182,7 @@ export async function createEmployee(data: EmployeeInput): Promise<{ success: bo
 
       if (userRoleIds && userRoleIds.length > 0) {
         await tx.userRole.createMany({
-          data: userRoleIds.map((roleId) => ({
+          data: userRoleIds.map((roleId: string) => ({
             tenantId,
             userId: user!.id,
             roleId,
@@ -111,11 +198,9 @@ export async function createEmployee(data: EmployeeInput): Promise<{ success: bo
         resourceId: user.id,
         metadata: { email: user.email, employeeId: employee.id, via: "employee.create" },
       });
-
-      // Passwort-Reset/Welcome-E-Mail wird später implementiert; bis dahin gilt das temporäre Passwort.
     }
 
-    revalidatePath('/dashboard/employees');
+    revalidatePath('/dashboard/modules/employees');
 
     await logAudit({
       tenantId,
@@ -130,12 +215,10 @@ export async function createEmployee(data: EmployeeInput): Promise<{ success: bo
   });
 }
 
-export async function updateEmployee(id: string, data: EmployeeInput): Promise<{ success: boolean; error?: string }> {
+export async function updateEmployee(id: string, data: UpdateEmployeeInput): Promise<{ success: boolean; error?: string }> {
   const { tenantId, session } = await requirePermission("employees:update");
-  const validated = EmployeeSchema.parse(data);
-  const { startDate, createUserAccount, userRoleIds, ...employeeData } = validated;
-  void createUserAccount;
-  void userRoleIds;
+  const normalized = normalizeUpdateEmployeeInput(data);
+  const validated = parseUpdateEmployeeInput(normalized);
 
   return withTenant(tenantId, async (tx) => {
     const existing = await tx.employee.findUnique({ where: { id } });
@@ -143,25 +226,31 @@ export async function updateEmployee(id: string, data: EmployeeInput): Promise<{
       return { success: false, error: "Mitarbeiter nicht gefunden" };
     }
 
-    if (employeeData.email && employeeData.email !== existing.email) {
+    if (validated.email && validated.email !== existing.email) {
       const conflict = await tx.employee.findFirst({
-        where: { tenantId, email: employeeData.email, id: { not: id } },
+        where: { tenantId, email: validated.email, id: { not: id } },
       });
       if (conflict) {
         return { success: false, error: "Ein Mitarbeiter mit dieser E-Mail existiert bereits" };
       }
     }
 
+    if (validated.employeeNumber && validated.employeeNumber !== existing.employeeNumber) {
+      const numberConflict = await tx.employee.findFirst({
+        where: { tenantId, employeeNumber: validated.employeeNumber, id: { not: id } },
+      });
+      if (numberConflict) {
+        return { success: false, error: "Diese Mitarbeiternummer existiert bereits" };
+      }
+    }
+
     const employee = await tx.employee.update({
       where: { id },
-      data: {
-        ...employeeData,
-        startDate: startDate ? new Date(startDate) : null,
-      },
+      data: validated,
     });
 
-    revalidatePath('/dashboard/employees');
-    revalidatePath(`/dashboard/employees/${id}`);
+    revalidatePath('/dashboard/modules/employees');
+    revalidatePath(`/dashboard/modules/employees/${id}`);
 
     await logAudit({
       tenantId,
@@ -193,7 +282,7 @@ export async function deleteEmployee(id: string): Promise<{ success: boolean; er
     await tx.employee.delete({
       where: { id },
     });
-    revalidatePath('/dashboard/employees');
+    revalidatePath('/dashboard/modules/employees');
 
     await logAudit({
       tenantId,
@@ -203,6 +292,111 @@ export async function deleteEmployee(id: string): Promise<{ success: boolean; er
       resourceId: id,
     });
 
+    return { success: true };
+  });
+}
+
+// ------------------------------------------------------------------
+// Employment contracts
+// ------------------------------------------------------------------
+
+export async function getEmploymentContracts(employeeId: string) {
+  const { tenantId } = await requirePermission("employees:read");
+  return withTenant(tenantId, async (tx) => {
+    return tx.employmentContract.findMany({
+      where: { tenantId, employeeId, isDeleted: false },
+      orderBy: { startDate: 'desc' },
+    });
+  });
+}
+
+export async function createEmploymentContract(
+  employeeId: string,
+  data: EmploymentContractInput
+): Promise<{ success: boolean; error?: string; contractId?: string }> {
+  const { tenantId, session } = await requirePermission("employees:update");
+  const validated = employmentContractSchema.parse(data);
+
+  return withTenant(tenantId, async (tx) => {
+    const employee = await tx.employee.findUnique({ where: { id: employeeId } });
+    if (!employee || employee.tenantId !== tenantId) {
+      return { success: false, error: "Mitarbeiter nicht gefunden" };
+    }
+
+    const contract = await tx.employmentContract.create({
+      data: { ...validated, tenantId, employeeId },
+    });
+
+    await logAudit({
+      tenantId,
+      userId: session.user.id,
+      action: "employmentContract.create",
+      resourceType: "employmentContract",
+      resourceId: contract.id,
+      metadata: { employeeId },
+    });
+
+    revalidatePath(`/dashboard/modules/employees/${employeeId}`);
+    return { success: true, contractId: contract.id };
+  });
+}
+
+export async function updateEmploymentContract(
+  contractId: string,
+  data: EmploymentContractInput
+): Promise<{ success: boolean; error?: string }> {
+  const { tenantId, session } = await requirePermission("employees:update");
+  const validated = employmentContractSchema.parse(data);
+
+  return withTenant(tenantId, async (tx) => {
+    const existing = await tx.employmentContract.findUnique({ where: { id: contractId } });
+    if (!existing || existing.tenantId !== tenantId) {
+      return { success: false, error: "Vertrag nicht gefunden" };
+    }
+
+    await tx.employmentContract.update({
+      where: { id: contractId },
+      data: validated,
+    });
+
+    await logAudit({
+      tenantId,
+      userId: session.user.id,
+      action: "employmentContract.update",
+      resourceType: "employmentContract",
+      resourceId: contractId,
+      metadata: { employeeId: existing.employeeId },
+    });
+
+    revalidatePath(`/dashboard/modules/employees/${existing.employeeId}`);
+    return { success: true };
+  });
+}
+
+export async function deleteEmploymentContract(contractId: string): Promise<{ success: boolean; error?: string }> {
+  const { tenantId, session } = await requirePermission("employees:update");
+
+  return withTenant(tenantId, async (tx) => {
+    const existing = await tx.employmentContract.findUnique({ where: { id: contractId } });
+    if (!existing || existing.tenantId !== tenantId) {
+      return { success: false, error: "Vertrag nicht gefunden" };
+    }
+
+    await tx.employmentContract.update({
+      where: { id: contractId },
+      data: { isDeleted: true, deletedAt: new Date(), deletedById: session.user.id },
+    });
+
+    await logAudit({
+      tenantId,
+      userId: session.user.id,
+      action: "employmentContract.delete",
+      resourceType: "employmentContract",
+      resourceId: contractId,
+      metadata: { employeeId: existing.employeeId },
+    });
+
+    revalidatePath(`/dashboard/modules/employees/${existing.employeeId}`);
     return { success: true };
   });
 }
