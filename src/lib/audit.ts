@@ -12,6 +12,8 @@ export type AuditAction =
   | "tenant.deactivate"
   | "file.upload"
   | "file.download"
+  | "file.delete"
+  | "file.view"
   | "employee.create"
   | "employee.update"
   | "employee.delete"
@@ -22,6 +24,53 @@ export type AuditAction =
   | "user.role.remove"
   | "user.create"
   | "user.delete";
+
+export type FileAccessType = "upload" | "download" | "delete" | "view";
+
+interface LogFileAccessParams {
+  tenantId: string;
+  userId?: string;
+  accessType: FileAccessType;
+  fileId: string;
+  fileName: string;
+  storageKey: string;
+  metadata?: Prisma.InputJsonValue;
+}
+
+/**
+ * Logs a file access event (upload, download, view, delete) to the AuditLog.
+ * This is a thin wrapper around logAudit with consistent resourceType/resourceId conventions.
+ */
+export async function logFileAccess({
+  tenantId,
+  userId,
+  accessType,
+  fileId,
+  fileName,
+  storageKey,
+  metadata,
+}: LogFileAccessParams) {
+  const actionMap: Record<FileAccessType, AuditAction> = {
+    upload: "file.upload",
+    download: "file.download",
+    view: "file.view",
+    delete: "file.delete",
+  };
+
+  return logAudit({
+    tenantId,
+    userId,
+    action: actionMap[accessType],
+    resourceType: "file",
+    resourceId: fileId,
+    metadata: {
+      fileName,
+      storageKey,
+      accessType,
+      ...(typeof metadata === "object" && metadata !== null ? metadata : {}),
+    },
+  });
+}
 
 interface LogAuditParams {
   tenantId: string;
