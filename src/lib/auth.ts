@@ -51,18 +51,18 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
     CredentialsProvider({
       name: "Credentials",
       credentials: {
-        externalId: { label: "Firmen-ID", type: "text" },
+        tenantId: { label: "Firmen-ID", type: "text" },
         email: { label: "E-Mail", type: "email" },
         password: { label: "Passwort", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.externalId || !credentials?.email || !credentials?.password) {
+        if (!credentials?.tenantId || !credentials?.email || !credentials?.password) {
           return null;
         }
 
         const email = credentials.email as string;
         const password = credentials.password as string;
-        const externalId = credentials.externalId as string;
+        const externalId = credentials.tenantId as string;
 
         const ipAddress = "unknown"; // Note: In production, get this from headers/request
 
