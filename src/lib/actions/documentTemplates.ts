@@ -30,13 +30,14 @@ export async function getDocumentTemplates(includeInactive = false) {
     orderBy: { name: "asc" },
   });
 
-  // attach known + custom variables for each template
-  const templatesWithVars = templates.map((t) => ({
-    ...t,
-    variables: Array.from(
-      new Set([...extractCustomVariables(t.content), ...AVAILABLE_VARIABLES.map((v) => v.key)])
-    ),
-  }));
+  // attach variables actually used in this template: custom + known variables present in content
+  const knownKeys = new Set(AVAILABLE_VARIABLES.map((v) => v.key));
+  const templatesWithVars = templates.map((t) => {
+    const usedKeys = new Set(extractCustomVariables(t.content));
+    (t.content.match(/\{\{(\w+)\}\}/g) ?? []).forEach((m) => usedKeys.add(m.slice(2, -2)));
+    const variables = Array.from(usedKeys).filter((k) => knownKeys.has(k));
+    return { ...t, variables };
+  });
 
   return { success: true, templates: templatesWithVars };
 }

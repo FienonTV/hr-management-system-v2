@@ -46,6 +46,11 @@ export function TemplateEditor({ initialContent = "", onChange }: TemplateEditor
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
     },
+    onCreate: ({ editor }) => {
+      if (typeof window !== "undefined") {
+        (window as unknown as Record<string, unknown>).__templateEditor__ = editor;
+      }
+    },
   });
 
   useEffect(() => {
