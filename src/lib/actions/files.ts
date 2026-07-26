@@ -7,7 +7,11 @@ import { prismaAdmin } from "@/lib/db/prisma";
 import { getStorageAdapter } from "@/lib/storage";
 import { randomUUID } from "node:crypto";
 import { createHash } from "node:crypto";
-import type { FileCategory, File as FileRecord } from "@prisma/client";
+import type { FileCategory, File as PrismaFile, DocumentCategory } from "@prisma/client";
+
+export type FileRecord = PrismaFile & {
+  documentCategories?: { category: DocumentCategory }[];
+};
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const MAX_FILE_NAME_LENGTH = 255;
@@ -193,6 +197,7 @@ export async function uploadFile(
     notes?: string;
     expiresAt?: Date | string;
     isPublic?: boolean;
+    documentCategoryIds?: string[];
   }
 ): Promise<{ success: true; fileId: string; storageKey: string } | { success: false; error: string }> {
   const { tenantId, userId, employeeId, session } = await getUserContext();
@@ -243,44 +248,47 @@ export async function uploadFile(
   }
 
   return withTenant(tenantId, async (tx) => {
-    const created = await tx.file.create({
-      data: {
-        id: fileId,
-        tenantId,
-        uploadedById: userId,
-        employeeId: options.employeeId || employeeId || null,
-        parentType: options.parentType || null,
-        parentId: options.parentId || null,
-        originalName: file.name,
-        storageKey,
-        mimeType,
-        sizeBytes: file.size,
-        checksum,
-        isPublic: options.isPublic ?? false,
-        expiresAt,
-        category: options.category || "OTHER",
-        title: options.title ?? "",
-        notes: options.notes ?? null,
-        version: 1,
-        isLatestVersion: true,
-      },
-    });
-
-    await logAudit({
+  const created = await tx.file.create({
+    data: {
+      id: fileId,
       tenantId,
-      userId,
-      action: "file.create",
-      resourceType: "file",
-      resourceId: created.id,
-      metadata: {
-        originalName: created.originalName,
-        sizeBytes: created.sizeBytes,
-        mimeType: created.mimeType,
-        category: created.category,
+      uploadedById: userId,
+      employeeId: options.employeeId || employeeId || null,
+      parentType: options.parentType || null,
+      parentId: options.parentId || null,
+      originalName: file.name,
+      storageKey,
+      mimeType,
+      sizeBytes: file.size,
+      checksum,
+      isPublic: options.isPublic ?? false,
+      expiresAt,
+      category: options.category || "OTHER",
+      title: options.title ?? "",
+      notes: options.notes ?? null,
+      version: 1,
+      isLatestVersion: true,
+      documentCategories: {
+        create: (options.documentCategoryIds ?? []).map((categoryId) => ({ categoryId })),
       },
-    });
+    },
+  });
 
-    return { success: true, fileId: created.id, storageKey: created.storageKey };
+  await logAudit({
+    tenantId,
+    userId,
+    action: "file.create",
+    resourceType: "file",
+    resourceId: created.id,
+    metadata: {
+      originalName: created.originalName,
+      sizeBytes: created.sizeBytes,
+      mimeType: created.mimeType,
+      category: created.category,
+    },
+  });
+
+  return { success: true, fileId: created.id, storageKey: created.storageKey };
   });
 }
 
@@ -454,6 +462,11 @@ export async function listFiles(options: {
         orderBy: { createdAt: "desc" },
         take: limit,
         skip: offset,
+        include: {
+          documentCategories: {
+            include: { category: true },
+          },
+        },
       }),
       tx.file.count({ where }),
     ]);

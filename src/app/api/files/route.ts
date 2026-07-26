@@ -32,6 +32,10 @@ export async function POST(request: NextRequest) {
     const expiresAt = String(formData.get("expiresAt") || "");
     const title = String(formData.get("title") || "");
     const notes = String(formData.get("notes") || "");
+    const documentCategoryIds = String(formData.get("documentCategoryIds") || "")
+      .split(",")
+      .map((id) => id.trim())
+      .filter(Boolean);
 
     const validCategory = FILE_CATEGORIES.includes(category as FileCategory)
       ? (category as FileCategory)
@@ -45,6 +49,7 @@ export async function POST(request: NextRequest) {
       title: title || undefined,
       notes: notes || undefined,
       expiresAt: expiresAt ? new Date(expiresAt) : undefined,
+      documentCategoryIds,
     });
 
     if (!result.success) {
