@@ -4,7 +4,11 @@ import { useEffect, useState } from "react";
 import { Upload, Download, Trash2, FileStack, X } from "lucide-react";
 import { listFiles, deleteFile } from "@/lib/actions/files";
 import { getDocumentCategories } from "@/lib/actions/documentCategories";
-import { getDocumentTemplates, generateDocumentFromTemplate } from "@/lib/actions/documentTemplates";
+import {
+  getDocumentTemplates,
+  generateDocumentFromTemplate,
+  getTemplateCustomVariables,
+} from "@/lib/actions/documentTemplates";
 import type { File as PrismaFile, DocumentCategory as PrismaDocumentCategory } from "@prisma/client";
 
 type FileItem = PrismaFile & { documentCategories?: { category: PrismaDocumentCategory }[] };
@@ -33,6 +37,8 @@ export default function DocumentsTab({
   const [generatedExpiresAt, setGeneratedExpiresAt] = useState("");
   const [generatedNotes, setGeneratedNotes] = useState("");
   const [generatedCategoryIds, setGeneratedCategoryIds] = useState<Set<string>>(new Set());
+  const [customVariables, setCustomVariables] = useState<Record<string, string>>({});
+  const [customVarKeys, setCustomVarKeys] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -111,6 +117,7 @@ export default function DocumentsTab({
         expiresAt: generatedExpiresAt,
         notes: generatedNotes,
         categoryIds: Array.from(generatedCategoryIds),
+        customValues: customVariables,
       });
       if (!result.success) {
         setError(result.error || "Generierung fehlgeschlagen");
@@ -122,6 +129,8 @@ export default function DocumentsTab({
       setGeneratedExpiresAt("");
       setGeneratedNotes("");
       setGeneratedCategoryIds(new Set());
+      setCustomVariables({});
+      setCustomVarKeys([]);
       await reloadFiles();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Generierung fehlgeschlagen");
@@ -364,11 +373,21 @@ export default function DocumentsTab({
                 <select
                   required
                   value={selectedTemplateId ?? ""}
-                  onChange={(e) => {
+                  onChange={async (e) => {
                     const id = e.target.value;
                     setSelectedTemplateId(id || null);
                     const tmpl = templates.find((t) => t.id === id);
                     if (tmpl) setGeneratedTitle(tmpl.name);
+                    if (id) {
+                      const res = await getTemplateCustomVariables(id);
+                      if (res.success) {
+                        setCustomVarKeys(res.variables ?? []);
+                        setCustomVariables({});
+                      }
+                    } else {
+                      setCustomVarKeys([]);
+                      setCustomVariables({});
+                    }
                   }}
                   className="w-full rounded-lg border border-gray-300 px-4 py-2.5"
                 >
@@ -378,6 +397,24 @@ export default function DocumentsTab({
                   ))}
                 </select>
               </div>
+
+              {customVarKeys.length > 0 && (
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">Zusätzliche Variablen</label>
+                  {customVarKeys.map((key) => (
+                    <div key={key} className="grid grid-cols-3 gap-3">
+                      <label className="col-span-1 text-sm text-gray-700">{key}</label>
+                      <input
+                        type="text"
+                        value={customVariables[key] ?? ""}
+                        onChange={(e) => setCustomVariables((prev) => ({ ...prev, [key]: e.target.value }))}
+                        placeholder={`{{${key}}}`}
+                        className="col-span-2 w-full rounded-lg border border-gray-300 px-4 py-2"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
 
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700">Titel</label>

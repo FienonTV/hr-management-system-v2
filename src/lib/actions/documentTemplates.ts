@@ -5,7 +5,13 @@ import { requirePermission } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
 import { prismaAdmin } from "@/lib/db/prisma";
-import { renderTemplateToPdf, extractVariables, buildEmployeeContext } from "@/lib/pdf/engine";
+import {
+  substituteVariables,
+  extractCustomVariables,
+  buildVariableMap,
+  AVAILABLE_VARIABLES,
+} from "@/lib/templateVariables";
+import { renderHtmlToPdf } from "@/lib/pdf/engine";
 import { getStorageAdapter } from "@/lib/storage";
 import { randomUUID } from "node:crypto";
 import { createHash } from "node:crypto";
@@ -24,7 +30,15 @@ export async function getDocumentTemplates(includeInactive = false) {
     orderBy: { name: "asc" },
   });
 
-  return { success: true, templates };
+  // attach known + custom variables for each template
+  const templatesWithVars = templates.map((t) => ({
+    ...t,
+    variables: Array.from(
+      new Set([...extractCustomVariables(t.content), ...AVAILABLE_VARIABLES.map((v) => v.key)])
+    ),
+  }));
+
+  return { success: true, templates: templatesWithVars };
 }
 
 export async function createDocumentTemplate(input: {
@@ -37,7 +51,7 @@ export async function createDocumentTemplate(input: {
   const { tenantId, session } = await requirePermission("documentTemplates:manage");
   const userId = session.user.id;
 
-  const variables = extractVariables(input.content);
+  const variables = extractCustomVariables(input.content);
 
   const template = await withTenant(tenantId, async (tx) => {
     return tx.documentTemplate.create({
@@ -86,7 +100,7 @@ export async function updateDocumentTemplate(
     return { success: false, error: "Vorlage nicht gefunden" };
   }
 
-  const variables = extractVariables(input.content);
+  const variables = extractCustomVariables(input.content);
 
   const template = await withTenant(tenantId, async (tx) => {
     return tx.documentTemplate.update({
@@ -154,6 +168,7 @@ export async function generateDocumentFromTemplate(
     expiresAt?: string;
     notes?: string;
     categoryIds?: string[];
+    customValues?: Record<string, string>;
   }
 ) {
   const { tenantId, session } = await requirePermission("documents:generate");
@@ -176,13 +191,23 @@ export async function generateDocumentFromTemplate(
   if (!template) return { success: false, error: "Vorlage nicht gefunden" };
   if (!employee) return { success: false, error: "Mitarbeiter nicht gefunden" };
 
-  const context = buildEmployeeContext(
-    employee as unknown as Record<string, unknown>,
+  const customValues = options.customValues ?? {};
+  const missingCustom = extractCustomVariables(template.content).filter((key) => !(key in customValues));
+  if (missingCustom.length > 0) {
+    return {
+      success: false,
+      error: `Bitte Werte für Variablen angeben: ${missingCustom.join(", ")}`,
+    };
+  }
+
+  const context = buildVariableMap(
+    employee as unknown as Parameters<typeof buildVariableMap>[0],
     tenant?.name ?? "",
-    new Date()
+    customValues
   );
 
-  const pdfBuffer = await renderTemplateToPdf(template.content, context, {
+  const substitutedBody = substituteVariables(template.content, context);
+  const pdfBuffer = await renderHtmlToPdf(substitutedBody, {
     format: "A4",
     printBackground: true,
   });
@@ -240,4 +265,19 @@ export async function generateDocumentFromTemplate(
 
   revalidatePath("/dashboard/modules/employees/[id]", "page");
   return { success: true, fileId: created.id };
+}
+
+export async function getTemplateCustomVariables(templateId: string): Promise<{
+  success: boolean;
+  variables?: string[];
+  error?: string;
+}> {
+  const { tenantId } = await requirePermission("documents:read");
+
+  const template = await prismaAdmin.documentTemplate.findFirst({
+    where: { id: templateId, tenantId, isActive: true },
+  });
+  if (!template) return { success: false, error: "Vorlage nicht gefunden" };
+
+  return { success: true, variables: extractCustomVariables(template.content) };
 }
