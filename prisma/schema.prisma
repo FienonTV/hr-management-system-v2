@@ -32,7 +32,7 @@ model Tenant {
   invitationTokens    InvitationToken[]
   employmentContracts EmploymentContract[]
   documentCategories DocumentCategory[]
-  documentContainers DocumentContainer[]
+  documentTemplates  DocumentTemplate[]
 
   @@map("tenants")
 }
@@ -78,7 +78,6 @@ model User {
   permissions UserPermission[]
   files       File[]
   auditLogs   AuditLog[]
-  documentContainers DocumentContainer[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -195,95 +194,96 @@ model DocumentCategory {
 
   tenant Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   files  FileDocumentCategory[]
+  templates DocumentTemplate[]
 
   @@unique([tenantId, name])
   @@index([tenantId, isActive])
   @@map("document_categories")
 }
 
-model FileDocumentCategory {
-  id         String @id @default(cuid())
-  fileId     String @map("file_id")
-  categoryId String @map("category_id")
-
-  file     File             @relation(fields: [fileId], references: [id], onDelete: Cascade)
-  category DocumentCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-
-  @@unique([fileId, categoryId])
-  @@index([categoryId])
-  @@map("file_document_categories")
-}
-
-model DocumentContainer {
-  id           String    @id @default(cuid())
-  tenantId     String    @map("tenant_id")
-  employeeId   String    @map("employee_id")
-  title        String
-  description  String?
-  validFrom    DateTime? @map("valid_from")
-  expiresAt    DateTime? @map("expires_at")
-  notes        String?
-  snoozedUntil DateTime? @map("snoozed_until")
-  uploadedById String?   @map("uploaded_by_id")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
-
-  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  uploadedBy User?  @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
-  files    File[]
-
-  @@index([tenantId])
-  @@index([tenantId, employeeId])
-  @@index([tenantId, expiresAt])
-  @@map("document_containers")
-}
+// ------------------------------------------------------------------
+// CORE: Files
+// ------------------------------------------------------------------
 
 model File {
-  id                 String       @id @default(cuid())
-  tenantId           String       @map("tenant_id")
-  employeeId         String?      @map("employee_id")
-  documentContainerId String?     @map("document_container_id")
-  uploadedById       String?      @map("uploaded_by_id")
-  originalName       String
-  storageKey         String       @unique
-  mimeType           String
-  sizeBytes          Int
-  checksum           String?
-  isPublic           Boolean      @default(false)
-  expiresAt          DateTime?
-  metadata           Json?
-  textContent        String?      @map("text_content")
-  category           FileCategory @default(OTHER)
-  parentType         String?      @map("parent_type") // e.g. "employee", "tenant", "contract"
-  parentId           String?      @map("parent_id")
-  version            Int          @default(1)
-  versionOfId        String?      @map("version_of_id") // points to the first/original file id
-  isLatestVersion    Boolean      @default(true) @map("is_latest_version")
-  isDeleted          Boolean      @default(false)
-  deletedAt          DateTime?    @map("deleted_at")
-  deletedById        String?      @map("deleted_by_id")
-  createdAt          DateTime     @default(now()) @map("created_at")
-  updatedAt          DateTime     @updatedAt @map("updated_at")
+  id                String       @id @default(cuid())
+  tenantId          String       @map("tenant_id")
+  employeeId        String?      @map("employee_id")
+  uploadedById      String?      @map("uploaded_by_id")
+  title             String       @default("") // display title independent of original file name
+  originalName      String
+  storageKey        String       @unique
+  mimeType          String
+  sizeBytes         Int
+  checksum          String?
+  isPublic          Boolean      @default(false)
+  expiresAt         DateTime?
+  notes             String?
+  snoozedUntil      DateTime?    @map("snoozed_until")
+  metadata          Json?
+  textContent       String?      @map("text_content")
+  category          FileCategory @default(OTHER)
+  parentType        String?      @map("parent_type") // e.g. "employee", "tenant", "contract", "documentTemplate"
+  parentId          String?      @map("parent_id")
+  version           Int          @default(1)
+  versionOfId       String?      @map("version_of_id") // points to the first/original file id
+  isLatestVersion   Boolean      @default(true) @map("is_latest_version")
+  isDeleted         Boolean      @default(false)
+  deletedAt         DateTime?    @map("deleted_at")
+  deletedById       String?      @map("deleted_by_id")
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
 
-  tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  uploadedBy        User?              @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
-  employee          Employee?          @relation(fields: [employeeId], references: [id], onDelete: SetNull)
-  documentContainer DocumentContainer?  @relation(fields: [documentContainerId], references: [id], onDelete: SetNull)
-  versions          File[]             @relation("FileVersions")
-  versionOf         File?              @relation("FileVersions", fields: [versionOfId], references: [id], onDelete: SetNull)
-  categories        FileDocumentCategory[]
+  tenant            Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  uploadedBy        User?                 @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  employee          Employee?               @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  versions          File[]                  @relation("FileVersions")
+  versionOf         File?                   @relation("FileVersions", fields: [versionOfId], references: [id], onDelete: SetNull)
+  documentCategories FileDocumentCategory[]
 
   @@index([tenantId])
   @@index([tenantId, storageKey])
   @@index([tenantId, uploadedById])
   @@index([tenantId, employeeId])
-  @@index([tenantId, documentContainerId])
   @@index([tenantId, parentType, parentId])
   @@index([tenantId, category])
   @@index([tenantId, isDeleted])
   @@index([versionOfId])
   @@map("files")
+}
+
+model FileDocumentCategory {
+  id          String @id @default(cuid())
+  fileId      String @map("file_id")
+  categoryId  String @map("category_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  file      File             @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  category  DocumentCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([fileId, categoryId])
+  @@index([fileId])
+  @@index([categoryId])
+  @@map("file_document_categories")
+}
+
+model DocumentTemplate {
+  id          String   @id @default(cuid())
+  tenantId    String   @map("tenant_id")
+  name        String
+  description String?
+  content     String   @db.Text // HTML body with {{variable}} placeholders
+  variables   String[] @default([])
+  categoryId  String?  @map("category_id")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category DocumentCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, isActive])
+  @@map("document_templates")
 }
 
 // ------------------------------------------------------------------
@@ -413,7 +413,6 @@ model Employee {
   userAccount User?
   contracts   EmploymentContract[]
   files       File[]
-  documentContainers DocumentContainer[]
 
   @@unique([tenantId, employeeNumber])
   @@index([tenantId])

@@ -41,9 +41,7 @@ import {
 } from "@/lib/actions/employeeUsers";
 import { createInvitation } from "@/lib/actions/invitations";
 import { listFiles, deleteFile } from "@/lib/actions/files";
-import { createEmployeeDocument, getEmployeeDocuments, deleteEmployeeDocument } from "@/lib/actions/employeeDocuments";
-
-import type { Employee, EmploymentContract, RoleOption, EmployeeUserData, FileItem, DocumentContainer } from "./types";
+import type { Employee, EmploymentContract, RoleOption, EmployeeUserData, FileItem } from "./types";
 import type { EmploymentContractInput } from "@/lib/schemas/employees";
 
 type Tab = "stammdaten" | "vertraege" | "dokumente" | "user";
@@ -60,7 +58,6 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [contracts, setContracts] = useState<EmploymentContract[]>([]);
   const [files, setFiles] = useState<FileItem[]>([]);
-  const [documents, setDocuments] = useState<DocumentContainer[]>([]);
   const [activeTab, setActiveTab] = useState<Tab>("stammdaten");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -79,12 +76,8 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
           if (empData) {
             setEmployee(empData);
             setContracts(contractData);
-            const [fileResult, docResult] = await Promise.all([
-              listFiles({ employeeId: id, limit: 100 }),
-              getEmployeeDocuments(id),
-            ]);
+            const fileResult = await listFiles({ employeeId: id, limit: 100 });
             setFiles(fileResult.files);
-            setDocuments(docResult.success ? docResult.documents : []);
           } else {
             setError("Mitarbeiter nicht gefunden");
           }
@@ -360,7 +353,7 @@ const stringFields = [
       )}
 
       {activeTab === "dokumente" && (
-        <DocumentsTab employeeId={employee.id} files={files} documents={documents} onFilesChange={setFiles} onDocumentsChange={setDocuments} />
+        <DocumentsTab employeeId={employee.id} files={files} onFilesChange={setFiles} />
       )}
 
       {activeTab === "user" && (
@@ -823,15 +816,11 @@ function UserTab({ employeeId, email }: { employeeId: string; email: string | nu
 function DocumentsTab({
   employeeId,
   files,
-  documents,
   onFilesChange,
-  onDocumentsChange,
 }: {
   employeeId: string;
   files: FileItem[];
-  documents: DocumentContainer[];
   onFilesChange: (files: FileItem[]) => void;
-  onDocumentsChange: (documents: DocumentContainer[]) => void;
 }) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -860,12 +849,8 @@ function DocumentsTab({
       }
 
       form.reset();
-      const [updatedFiles, updatedDocs] = await Promise.all([
-        listFiles({ employeeId, limit: 100 }),
-        getEmployeeDocuments(employeeId),
-      ]);
+      const updatedFiles = await listFiles({ employeeId, limit: 100 });
       onFilesChange(updatedFiles.files);
-      onDocumentsChange(updatedDocs.success ? updatedDocs.documents : []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload fehlgeschlagen");
     } finally {
@@ -873,66 +858,15 @@ function DocumentsTab({
     }
   }
 
-  async function handleAssociateDocument(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(null);
-
-    const form = event.currentTarget;
-    const formData = new FormData(form);
-    const fileId = String(formData.get("fileId") || "");
-    const documentType = String(formData.get("documentType") || "");
-    const validFrom = String(formData.get("validFrom") || "");
-    const validUntil = String(formData.get("validUntil") || "");
-    const notes = String(formData.get("notes") || "");
-
-    if (!fileId || !documentType) {
-      setError("Datei und Dokumententyp erforderlich");
-      return;
-    }
-
-    const result = await createEmployeeDocument({
-      employeeId,
-      fileId,
-      documentType,
-      validFrom: validFrom || undefined,
-      validUntil: validUntil || undefined,
-      notes: notes || undefined,
-    });
-
-    if (!result.success) {
-      setError(result.error || "Zuordnung fehlgeschlagen");
-      return;
-    }
-
-    form.reset();
-    const updated = await getEmployeeDocuments(employeeId);
-    onDocumentsChange(updated.success ? updated.documents : []);
-  }
-
-  async function handleDeleteDocument(documentId: string) {
-    if (!confirm("Dokumentenzuordnung wirklich entfernen?")) return;
-    const result = await deleteEmployeeDocument(documentId, employeeId);
-    if (!result.success) {
-      setError(result.error || "Entfernen fehlgeschlagen");
-      return;
-    }
-    const updated = await getEmployeeDocuments(employeeId);
-    onDocumentsChange(updated.success ? updated.documents : []);
-  }
-
   async function handleDeleteFile(fileId: string) {
-    if (!confirm("Datei wirklich in den Papierkorb verschieben?")) return;
+    if (!confirm("Dokument wirklich in den Papierkorb verschieben?")) return;
     const result = await deleteFile(fileId);
     if (!result.success) {
       setError(result.error || "Löschen fehlgeschlagen");
       return;
     }
-    const [updatedFiles, updatedDocs] = await Promise.all([
-      listFiles({ employeeId, limit: 100 }),
-      getEmployeeDocuments(employeeId),
-    ]);
+    const updatedFiles = await listFiles({ employeeId, limit: 100 });
     onFilesChange(updatedFiles.files);
-    onDocumentsChange(updatedDocs.success ? updatedDocs.documents : []);
   }
 
   function formatBytes(bytes: number): string {
@@ -943,10 +877,22 @@ function DocumentsTab({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   }
 
+  function categoryLabel(category: FileItem["category"]) {
+    const labels: Record<string, string> = {
+      CONTRACT: "Vertrag",
+      PAYSLIP: "Lohnabrechnung",
+      DOCUMENT: "Dokument",
+      CERTIFICATE: "Bescheinigung",
+      AVATAR: "Avatar",
+      OTHER: "Sonstiges",
+    };
+    return labels[category] || category;
+  }
+
   return (
     <div className="space-y-6">
       <form onSubmit={handleUpload} className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm space-y-4">
-        <h3 className="text-lg font-medium text-gray-900">Datei hochladen</h3>
+        <h3 className="text-lg font-medium text-gray-900">Dokument hochladen</h3>
         {error && <div className="rounded-md bg-red-50 p-4 text-sm text-red-600">{error}</div>}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -981,15 +927,41 @@ function DocumentsTab({
           </div>
         </div>
 
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="space-y-2 sm:col-span-2">
+            <label htmlFor="title" className="block text-sm font-medium text-gray-700">
+              Dokumententitel
+            </label>
+            <input
+              id="title"
+              name="title"
+              type="text"
+              placeholder="z. B. Arbeitsvertrag 2026"
+              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="expiresAt" className="block text-sm font-medium text-gray-700">
+              Ablaufdatum (optional)
+            </label>
+            <input
+              id="expiresAt"
+              name="expiresAt"
+              type="date"
+              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+        </div>
+
         <div className="space-y-2">
-          <label htmlFor="expiresAt" className="block text-sm font-medium text-gray-700">
-            Ablaufdatum (optional)
+          <label htmlFor="notes" className="block text-sm font-medium text-gray-700">
+            Notizen
           </label>
-          <input
-            id="expiresAt"
-            name="expiresAt"
-            type="date"
-            className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 sm:w-64"
+          <textarea
+            id="notes"
+            name="notes"
+            rows={2}
+            className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
 
@@ -1003,78 +975,23 @@ function DocumentsTab({
         </button>
       </form>
 
-      <form onSubmit={handleAssociateDocument} className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm space-y-4">
-        <h3 className="text-lg font-medium text-gray-900">Hochgeladene Datei als Dokument zuordnen</h3>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="space-y-2 sm:col-span-2">
-            <label htmlFor="fileId" className="block text-sm font-medium text-gray-700">Datei</label>
-            <select
-              id="fileId"
-              name="fileId"
-              required
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-            >
-              <option value="">-- Datei wählen --</option>
-              {files.map((f) => (
-                <option key={f.id} value={f.id}>{f.originalName}</option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-2">
-            <label htmlFor="documentType" className="block text-sm font-medium text-gray-700">Dokumententyp</label>
-            <select
-              id="documentType"
-              name="documentType"
-              required
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-            >
-              <option value="">-- Typ wählen --</option>
-              <option value="CONTRACT">Vertrag</option>
-              <option value="PAYSLIP">Lohnabrechnung</option>
-              <option value="CERTIFICATE">Bescheinigung</option>
-              <option value="POLICY">Richtlinie</option>
-              <option value="OTHER">Sonstiges</option>
-            </select>
-          </div>
-          <div className="space-y-2">
-            <label htmlFor="validFrom" className="block text-sm font-medium text-gray-700">Gültig ab</label>
-            <input id="validFrom" name="validFrom" type="date" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500" />
-          </div>
-          <div className="space-y-2">
-            <label htmlFor="validUntil" className="block text-sm font-medium text-gray-700">Gültig bis</label>
-            <input id="validUntil" name="validUntil" type="date" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500" />
-          </div>
-        </div>
-        <div className="space-y-2">
-          <label htmlFor="docNotes" className="block text-sm font-medium text-gray-700">Notizen</label>
-          <textarea id="docNotes" name="notes" rows={2} className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500" />
-        </div>
-        <button
-          type="submit"
-          className="flex items-center space-x-2 rounded-lg border border-primary-300 px-4 py-2 text-sm font-medium text-primary-700 hover:bg-primary-50"
-        >
-          <Plus className="h-4 w-4" />
-          <span>Als Dokument zuordnen</span>
-        </button>
-      </form>
-
       <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
         <h3 className="text-lg font-medium text-gray-900">Dokumente</h3>
-        {documents.length === 0 ? (
-          <p className="mt-4 text-sm text-gray-500">Noch keine Dokumente zugeordnet.</p>
+        {files.length === 0 ? (
+          <p className="mt-4 text-sm text-gray-500">Noch keine Dokumente vorhanden.</p>
         ) : (
           <ul className="mt-4 divide-y divide-gray-200">
-            {documents.map((doc) => {
-              const file = doc.files[0];
-              if (!file) return null;
-              return (
-                <li key={doc.id} className="flex items-center justify-between py-3">
+            {files
+              .filter((f) => !f.isDeleted)
+              .map((file) => (
+                <li key={file.id} className="flex items-center justify-between py-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-gray-900">{file.originalName}</p>
+                    <p className="truncate text-sm font-medium text-gray-900">{file.title || file.originalName}</p>
                     <p className="text-xs text-gray-500">
-                      {doc.title} · {formatBytes(file.sizeBytes)} · {new Date(doc.createdAt).toLocaleDateString("de-DE")}
-                      {doc.validFrom && <span className="ml-2">gültig ab {new Date(doc.validFrom).toLocaleDateString("de-DE")}</span>}
-                      {doc.expiresAt && <span className="ml-2">gültig bis {new Date(doc.expiresAt).toLocaleDateString("de-DE")}</span>}
+                      {categoryLabel(file.category)} · {formatBytes(file.sizeBytes)} · Version {file.version}
+                      {file.expiresAt && (
+                        <span className="ml-2">· gültig bis {new Date(file.expiresAt).toLocaleDateString("de-DE")}</span>
+                      )}
                     </p>
                   </div>
                   <div className="ml-4 flex items-center space-x-2">
@@ -1088,59 +1005,15 @@ function DocumentsTab({
                     </a>
                     <button
                       type="button"
-                      onClick={() => handleDeleteDocument(doc.id)}
+                      onClick={() => handleDeleteFile(file.id)}
                       className="rounded-lg p-2 text-gray-500 hover:bg-red-50 hover:text-red-600"
-                      title="Zuordnung entfernen"
+                      title="In Papierkorb verschieben"
                     >
-                      <X className="h-4 w-4" />
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
                 </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
-
-      <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-        <h3 className="text-lg font-medium text-gray-900">Hochgeladene Dateien</h3>
-        {files.length === 0 ? (
-          <p className="mt-4 text-sm text-gray-500">Noch keine Dateien vorhanden.</p>
-        ) : (
-          <ul className="mt-4 divide-y divide-gray-200">
-            {files.map((file) => (
-              <li key={file.id} className="flex items-center justify-between py-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-gray-900">{file.originalName}</p>
-                  <p className="text-xs text-gray-500">
-                    {file.category} · {formatBytes(file.sizeBytes)} · {new Date(file.createdAt).toLocaleDateString("de-DE")}
-                    {file.expiresAt && (
-                      <span className="ml-2 inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800">
-                        Läuft ab am {new Date(file.expiresAt).toLocaleDateString("de-DE")}
-                      </span>
-                    )}
-                  </p>
-                </div>
-                <div className="ml-4 flex items-center space-x-2">
-                  <a
-                    href={`/api/files/${file.id}`}
-                    download
-                    className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-primary-600"
-                    title="Herunterladen"
-                  >
-                    <Download className="h-4 w-4" />
-                  </a>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteFile(file.id)}
-                    className="rounded-lg p-2 text-gray-500 hover:bg-red-50 hover:text-red-600"
-                    title="Löschen"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              </li>
-            ))}
+              ))}
           </ul>
         )}
       </div>

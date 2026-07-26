@@ -30,6 +30,8 @@ export async function POST(request: NextRequest) {
     const parentId = String(formData.get("parentId") || "");
     const category = String(formData.get("category") || "OTHER");
     const expiresAt = String(formData.get("expiresAt") || "");
+    const title = String(formData.get("title") || "");
+    const notes = String(formData.get("notes") || "");
 
     const validCategory = FILE_CATEGORIES.includes(category as FileCategory)
       ? (category as FileCategory)
@@ -40,6 +42,8 @@ export async function POST(request: NextRequest) {
       parentType: parentType || undefined,
       parentId: parentId || undefined,
       category: validCategory,
+      title: title || undefined,
+      notes: notes || undefined,
       expiresAt: expiresAt ? new Date(expiresAt) : undefined,
     });
 

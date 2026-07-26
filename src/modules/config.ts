@@ -15,10 +15,15 @@ export const employeesModule: ModuleConfig = {
     { key: "documents:create", module: "employees", resource: "document", action: "create", description: "Dokumente erstellen" },
     { key: "documents:update", module: "employees", resource: "document", action: "update", description: "Dokumente bearbeiten" },
     { key: "documents:delete", module: "employees", resource: "document", action: "delete", description: "Dokumente löschen" },
+    { key: "documentCategories:manage", module: "employees", resource: "documentCategory", action: "manage", description: "Dokumentenkategorien verwalten" },
+    { key: "documentTemplates:manage", module: "employees", resource: "documentTemplate", action: "manage", description: "Dokumentenvorlagen verwalten" },
+    { key: "documents:generate", module: "employees", resource: "document", action: "generate", description: "Dokumente aus Vorlagen generieren" },
   ],
   menuItems: [
     { id: "employees-list", label: "Mitarbeiter", path: "/dashboard/modules/employees", iconKey: "Users", requiredPermission: "employees:read" },
     { id: "documents-list", label: "Dokumente", path: "/dashboard/modules/documents", iconKey: "FileText", requiredPermission: "documents:read" },
+    { id: "document-categories", label: "Dokumentenkategorien", path: "/dashboard/modules/admin/document-categories", iconKey: "Tag", requiredPermission: "documentCategories:manage" },
+    { id: "document-templates", label: "Dokumentenvorlagen", path: "/dashboard/modules/admin/document-templates", iconKey: "FileStack", requiredPermission: "documentTemplates:manage" },
   ],
 };
 

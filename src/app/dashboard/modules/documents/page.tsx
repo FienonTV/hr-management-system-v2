@@ -4,13 +4,11 @@ import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Download, Search, Filter, BellOff, AlertTriangle, Clock, CheckCircle2, FileText } from "lucide-react";
-import { getAllDocumentContainers, snoozeDocumentContainer } from "@/lib/actions/employeeDocuments";
-import type { DocumentContainer } from "../employees/[id]/types";
+import { getAllDocuments, snoozeDocument } from "@/lib/actions/employeeDocuments";
+import type { File as FileRecord } from "@prisma/client";
 
-// Local enriched type for the list view
-type DocumentListItem = DocumentContainer & {
+type DocumentListItem = FileRecord & {
   employee: { firstName: string | null; lastName: string | null; employeeNumber: string | null };
-  latestFile: DocumentContainer["files"][number] | undefined;
 };
 
 export default function DocumentsPage() {
@@ -30,19 +28,13 @@ export default function DocumentsPage() {
     async function load() {
       setLoading(true);
       setError(null);
-      const result = await getAllDocumentContainers({ status, search: query, limit: 200 });
+      const result = await getAllDocuments({ status, search: query, limit: 200 });
       if (cancelled) return;
       if (!result.success) {
         setError((result as { error?: string }).error || "Fehler beim Laden");
         setDocuments([]);
       } else {
-        setDocuments(
-          result.containers.map((c) => ({
-            ...c,
-            employee: c.employee,
-            latestFile: c.files[0],
-          }))
-        );
+        setDocuments(result.documents as DocumentListItem[]);
       }
       setLoading(false);
     }
@@ -66,20 +58,20 @@ export default function DocumentsPage() {
     router.replace(`/dashboard/modules/documents?${params.toString()}`, { scroll: false });
   }
 
-  async function handleSnooze(containerId: string) {
+  async function handleSnooze(fileId: string) {
     const until = new Date();
     until.setDate(until.getDate() + 7);
-    const result = await snoozeDocumentContainer(containerId, until.toISOString());
+    const result = await snoozeDocument(fileId, until.toISOString());
     if (!result.success) {
-      setError(result.error || "Snooze fehlgeschlagen");
+      setError((result as { error?: string }).error || "Snooze fehlgeschlagen");
       return;
     }
-    setDocuments((prev) => prev.filter((d) => d.id !== containerId));
+    setDocuments((prev) => prev.filter((d) => d.id !== fileId));
   }
 
-  function statusBadge(container: DocumentListItem) {
+  function statusBadge(doc: DocumentListItem) {
     const now = new Date();
-    const expires = container.expiresAt ? new Date(container.expiresAt) : null;
+    const expires = doc.expiresAt ? new Date(doc.expiresAt) : null;
     if (!expires) {
       return <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800"><CheckCircle2 className="mr-1 h-3 w-3" />Gültig</span>;
     }
@@ -148,18 +140,16 @@ export default function DocumentsPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <FileText className="h-4 w-4 text-gray-400" />
-                    <p className="text-sm font-medium text-gray-900">{doc.title}</p>
+                    <p className="text-sm font-medium text-gray-900">{doc.title || doc.originalName}</p>
                     {statusBadge(doc)}
                   </div>
                   <p className="mt-1 text-xs text-gray-500">
                     {doc.employee.firstName} {doc.employee.lastName}
                     {doc.employee.employeeNumber && ` (#${doc.employee.employeeNumber})`}
                   </p>
-                  {doc.latestFile && (
-                    <p className="mt-1 text-xs text-gray-500">
-                      {doc.latestFile.originalName} · {formatBytes(doc.latestFile.sizeBytes)} · Version {doc.latestFile.version}
-                    </p>
-                  )}
+                  <p className="mt-1 text-xs text-gray-500">
+                    {doc.originalName} · {formatBytes(doc.sizeBytes)} · Version {doc.version}
+                  </p>
                   {doc.expiresAt && (
                     <p className="mt-1 text-xs text-gray-500">
                       Ablaufdatum: {new Date(doc.expiresAt).toLocaleDateString("de-DE")}
@@ -167,16 +157,14 @@ export default function DocumentsPage() {
                   )}
                 </div>
                 <div className="ml-4 flex items-center gap-2">
-                  {doc.latestFile && (
-                    <a
-                      href={`/api/files/${doc.latestFile.id}`}
-                      download
-                      className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-primary-600"
-                      title="Herunterladen"
-                    >
-                      <Download className="h-4 w-4" />
-                    </a>
-                  )}
+                  <a
+                    href={`/api/files/${doc.id}`}
+                    download
+                    className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-primary-600"
+                    title="Herunterladen"
+                  >
+                    <Download className="h-4 w-4" />
+                  </a>
                   <button
                     onClick={() => handleSnooze(doc.id)}
                     className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-primary-600"

@@ -12,6 +12,8 @@ import {
   Calendar,
   Plane,
   Trash2,
+  Tag,
+  FileStack,
 } from "lucide-react";
 import SidebarClient from "./SidebarClient";
 
@@ -28,6 +30,8 @@ export const ICON_MAP: Record<string, LucideIcon> = {
   Calendar,
   Plane,
   Trash2,
+  Tag,
+  FileStack,
 };
 
 export type SidebarItem = {

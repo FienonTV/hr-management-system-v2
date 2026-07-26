@@ -189,6 +189,8 @@ export async function uploadFile(
     parentType?: string;
     parentId?: string;
     category?: FileCategory;
+    title?: string;
+    notes?: string;
     expiresAt?: Date | string;
     isPublic?: boolean;
   }
@@ -257,6 +259,8 @@ export async function uploadFile(
         isPublic: options.isPublic ?? false,
         expiresAt,
         category: options.category || "OTHER",
+        title: options.title ?? "",
+        notes: options.notes ?? null,
         version: 1,
         isLatestVersion: true,
       },

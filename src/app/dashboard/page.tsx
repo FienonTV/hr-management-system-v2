@@ -2,7 +2,7 @@
 import { auth } from "@/lib/auth";
 import { getEffectiveTenantId } from "@/lib/session";
 import { getEffectivePermissions } from "@/lib/permissions";
-import { getExpiringDocumentContainers } from "@/lib/actions/employeeDocuments";
+import { getExpiringDocuments } from "@/lib/actions/employeeDocuments";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, FileText, AlertTriangle, Clock } from "lucide-react";
 
@@ -12,11 +12,11 @@ export default async function DashboardPage() {
   const effectivePermissions = session && tenantId ? await getEffectivePermissions(session.user.id, tenantId) : new Set<string>();
   const canReadDocuments = effectivePermissions.has("documents:read");
 
-  let expiringDocs: Awaited<ReturnType<typeof getExpiringDocumentContainers>>["containers"] = [];
+  let expiringDocs: Awaited<ReturnType<typeof getExpiringDocuments>>["documents"] = [];
   if (canReadDocuments) {
-    const result = await getExpiringDocumentContainers(5);
+    const result = await getExpiringDocuments(5);
     if (result.success) {
-      expiringDocs = result.containers;
+      expiringDocs = result.documents;
     }
   }
 
@@ -72,8 +72,8 @@ export default async function DashboardPage() {
                   <div>
                     <p className="text-sm font-medium text-gray-900">{doc.title}</p>
                     <p className="text-xs text-gray-500">
-                      {doc.employee.firstName} {doc.employee.lastName}
-                      {doc.employee.employeeNumber && ` (#${doc.employee.employeeNumber})`} · Ablauf: {doc.expiresAt ? new Date(doc.expiresAt).toLocaleDateString("de-DE") : "-"}
+                      {doc.employee?.firstName ?? ""} {doc.employee?.lastName ?? ""}
+                      {doc.employee?.employeeNumber && ` (#${doc.employee.employeeNumber})`} · Ablauf: {doc.expiresAt ? new Date(doc.expiresAt).toLocaleDateString("de-DE") : "-"}
                     </p>
                   </div>
                   <Link
