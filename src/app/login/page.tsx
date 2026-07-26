@@ -28,7 +28,7 @@ function LoginForm() {
 
     try {
       await signIn("credentials", {
-        externalId,
+        tenantId: externalId,
         email,
         password,
         callbackUrl: "/dashboard",
