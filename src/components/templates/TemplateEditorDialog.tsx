@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { TemplateEditor } from "./TemplateEditor";
 
 interface Category {
@@ -40,6 +40,16 @@ export function TemplateEditorDialog({
   const [content, setContent] = useState(template?.content ?? "<p></p>");
   const [categoryId, setCategoryId] = useState(template?.categoryId ?? "");
   const [isActive, setIsActive] = useState(template?.isActive ?? true);
+
+  useEffect(() => {
+    if (isOpen) {
+      setName(template?.name ?? "");
+      setDescription(template?.description ?? "");
+      setContent(template?.content ?? "<p></p>");
+      setCategoryId(template?.categoryId ?? "");
+      setIsActive(template?.isActive ?? true);
+    }
+  }, [isOpen, template?.id, template?.name, template?.description, template?.content, template?.categoryId, template?.isActive]);
 
   if (!isOpen) return null;
 
