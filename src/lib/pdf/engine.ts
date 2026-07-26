@@ -80,6 +80,7 @@ export async function renderHtmlToPdf(
   const browser = await puppeteer.launch({
     headless: true,
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || "C:\\Users\\simon\\.cache\\puppeteer\\chrome\\win64-151.0.7922.47\\chrome-win64\\chrome.exe",
   });
 
   try {

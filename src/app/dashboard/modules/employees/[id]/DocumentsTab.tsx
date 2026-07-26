@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Upload, Download, Trash2, FileStack, X } from "lucide-react";
-import { listFiles, deleteFile } from "@/lib/actions/files";
+import { Upload, Download, Trash2, FileStack, X, History, Plus } from "lucide-react";
+import { listFiles, deleteFile, uploadNewVersion, getFileVersions } from "@/lib/actions/files";
 import { getDocumentCategories } from "@/lib/actions/documentCategories";
 import {
   getDocumentTemplates,
@@ -40,6 +40,11 @@ export default function DocumentsTab({
   const [customVariables, setCustomVariables] = useState<Record<string, string>>({});
   const [customVarKeys, setCustomVarKeys] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [showVersionModal, setShowVersionModal] = useState(false);
+  const [versionFileId, setVersionFileId] = useState<string | null>(null);
+  const [versionFile, setVersionFile] = useState<FileItem | null>(null);
+  const [versions, setVersions] = useState<FileItem[]>([]);
+  const [uploadingVersion, setUploadingVersion] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -102,6 +107,49 @@ export default function DocumentsTab({
       return;
     }
     await reloadFiles();
+  }
+
+  async function openVersionModal(file: FileItem) {
+    setVersionFileId(file.id);
+    setVersionFile(file);
+    setError(null);
+    setShowVersionModal(true);
+    try {
+      const versionList = await getFileVersions(file.id);
+      setVersions(versionList);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Fehler beim Laden der Versionen");
+    }
+  }
+
+  async function handleUploadVersion(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!versionFileId) return;
+    const form = event.currentTarget;
+    const input = form.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) {
+      setError("Bitte eine Datei auswählen");
+      return;
+    }
+
+    setUploadingVersion(true);
+    setError(null);
+    try {
+      const result = await uploadNewVersion(versionFileId, file);
+      if (!result.success) {
+        setError(result.error || "Upload fehlgeschlagen");
+        return;
+      }
+      input.value = "";
+      const versionList = await getFileVersions(versionFileId);
+      setVersions(versionList);
+      await reloadFiles();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload fehlgeschlagen");
+    } finally {
+      setUploadingVersion(false);
+    }
   }
 
   async function handleGenerate(event: React.FormEvent) {
@@ -330,6 +378,14 @@ export default function DocumentsTab({
                     )}
                   </div>
                   <div className="ml-4 flex items-center space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => openVersionModal(file)}
+                      className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-primary-600"
+                      title="Versionen verwalten"
+                    >
+                      <History className="h-4 w-4" />
+                    </button>
                     <a
                       href={`/api/files/${file.id}`}
                       download
@@ -352,6 +408,77 @@ export default function DocumentsTab({
           </ul>
         )}
       </div>
+
+      {showVersionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-medium text-gray-900">Versionen: {versionFile?.title || versionFile?.originalName}</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowVersionModal(false);
+                  setVersionFileId(null);
+                  setVersionFile(null);
+                  setVersions([]);
+                }}
+                className="rounded-lg p-1 text-gray-500 hover:bg-gray-100"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUploadVersion} className="mb-6 space-y-4">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">Neue Version hochladen</label>
+                <input
+                  type="file"
+                  required
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 file:mr-4 file:rounded-md file:border-0 file:bg-primary-50 file:px-3 file:py-1 file:text-sm file:font-medium file:text-primary-700 hover:file:bg-primary-100"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={uploadingVersion}
+                className="flex items-center space-x-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+              >
+                <Plus className="h-4 w-4" />
+                <span>{uploadingVersion ? "Wird hochgeladen..." : "Version hochladen"}</span>
+              </button>
+            </form>
+
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-gray-700">Bisherige Versionen</h4>
+              {versions.length === 0 ? (
+                <p className="text-sm text-gray-500">Noch keine Versionen vorhanden.</p>
+              ) : (
+                <ul className="divide-y divide-gray-200">
+                  {versions.map((v) => (
+                    <li key={v.id} className="flex items-center justify-between py-2">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          Version {v.version} {v.isLatestVersion && <span className="ml-1 text-xs text-primary-600">(aktuell)</span>}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {formatBytes(v.sizeBytes)} · {new Date(v.createdAt).toLocaleString("de-DE")}
+                        </p>
+                      </div>
+                      <a
+                        href={`/api/files/${v.id}`}
+                        download
+                        className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-primary-600"
+                        title="Herunterladen"
+                      >
+                        <Download className="h-4 w-4" />
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {showTemplateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
