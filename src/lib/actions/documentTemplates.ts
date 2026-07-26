@@ -312,6 +312,10 @@ export async function generateDocumentGroup(
     companyName: string;
     signingCity?: string;
     pageNumbers?: boolean;
+    includeSummaryPage?: boolean;
+    summaryHeading?: string;
+    signatures?: Array<{ label: string; sublabel?: string }>;
+    agreementText?: string;
   }
 ) {
   const { tenantId, session } = await requirePermission("documents:generate");
@@ -371,6 +375,10 @@ export async function generateDocumentGroup(
       pageNumbers: options.pageNumbers,
       title: options.title,
       employeeFullName: `${employee.firstName} ${employee.lastName}`,
+      includeSummaryPage: options.includeSummaryPage,
+      summaryHeading: options.summaryHeading,
+      signatures: options.signatures,
+      agreementText: options.agreementText,
     }
   );
 

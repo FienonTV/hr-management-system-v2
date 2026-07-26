@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Files, X, Download, CheckCircle, ChevronRight, ChevronLeft, GripVertical } from "lucide-react";
+import { Files, X, Download, CheckCircle, ChevronRight, ChevronLeft, GripVertical, Plus } from "lucide-react";
 import { getDocumentTemplates, getTemplateCustomVariablesForMany, generateDocumentGroup } from "@/lib/actions/documentTemplates";
 import { getDocumentCategories } from "@/lib/actions/documentCategories";
 
@@ -59,6 +59,17 @@ export default function GroupGenerateDocumentModal({
   const [pageNumbers, setPageNumbers] = useState(false);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
   const [availableCategories, setAvailableCategories] = useState<Category[]>([]);
+  const [includeSummaryPage, setIncludeSummaryPage] = useState(true);
+  const [summaryHeading, setSummaryHeading] = useState("");
+  const [summaryHeadings, setSummaryHeadings] = useState<string[]>([
+    "Bestätigung zum Arbeitsvertrag",
+    "Vertragsbestätigung",
+    "Dokumentenvereinbarung",
+    "Zusammenfassung der Vereinbarungen",
+  ]);
+  const [includeEmployerSignature, setIncludeEmployerSignature] = useState(true);
+  const [includeEmployeeSignature, setIncludeEmployeeSignature] = useState(true);
+  const [extraSignatures, setExtraSignatures] = useState<Array<{ label: string; sublabel: string }>>([]);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,6 +87,11 @@ export default function GroupGenerateDocumentModal({
     setSigningCity(employeeCity ?? "");
     setPageNumbers(false);
     setSelectedCategoryIds([]);
+    setIncludeSummaryPage(true);
+    setSummaryHeading("");
+    setIncludeEmployerSignature(true);
+    setIncludeEmployeeSignature(true);
+    setExtraSignatures([]);
     setError(null);
     setGeneratedFileId(null);
 
@@ -174,6 +190,15 @@ export default function GroupGenerateDocumentModal({
     setError(null);
     setGeneratedFileId(null);
     try {
+      const signatures: Array<{ label: string; sublabel?: string }> = [];
+      if (includeEmployerSignature && companyName.trim()) {
+        signatures.push({ label: companyName.trim(), sublabel: "Arbeitgeber" });
+      }
+      if (includeEmployeeSignature && employeeFullName.trim()) {
+        signatures.push({ label: employeeFullName.trim(), sublabel: "Arbeitnehmer" });
+      }
+      signatures.push(...extraSignatures.map((s) => ({ label: s.label.trim(), sublabel: s.sublabel.trim() })).filter((s) => s.label));
+
       const result = await generateDocumentGroup(employeeId, {
         templateIds: selectedIds,
         customVariables: customVarValues,
@@ -183,6 +208,9 @@ export default function GroupGenerateDocumentModal({
         companyName: companyName.trim(),
         signingCity: signingCity.trim(),
         pageNumbers,
+        includeSummaryPage,
+        summaryHeading: summaryHeading.trim() || undefined,
+        signatures: signatures.length ? signatures : undefined,
       });
 
       if (!result.success) {
@@ -387,7 +415,7 @@ export default function GroupGenerateDocumentModal({
           )}
 
           {!generatedFileId && step === "meta" && (
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div className="rounded-lg bg-gray-50 border border-gray-200 px-4 py-3 text-sm text-gray-600 space-y-1">
                 {selectedTemplates.map((t, i) => (
                   <div key={t.id} className="flex items-center gap-2">
@@ -395,7 +423,110 @@ export default function GroupGenerateDocumentModal({
                     <span className="text-gray-800">{t.name}</span>
                   </div>
                 ))}
-                <p className="text-xs text-gray-400 mt-1.5">+ Automatische Zusammenfassungsseite</p>
+                <p className="text-xs text-gray-400 mt-1.5">{includeSummaryPage ? "+ Automatische Zusammenfassungsseite" : "+ Keine Zusammenfassungsseite"}</p>
+              </div>
+
+              <div className="rounded-lg border border-gray-200 p-4 space-y-3">
+                <label className="flex items-center gap-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={includeSummaryPage}
+                    onChange={(e) => setIncludeSummaryPage(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span className="text-sm font-medium text-gray-900">Zusammenfassungsseite generieren</span>
+                </label>
+
+                {includeSummaryPage && (
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700">Überschrift</label>
+                    <input
+                      type="text"
+                      value={summaryHeading}
+                      onChange={(e) => setSummaryHeading(e.target.value)}
+                      placeholder="Bestätigung zum Arbeitsvertrag"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                    />
+                    {summaryHeadings.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {summaryHeadings.map((h) => (
+                          <button
+                            key={h}
+                            type="button"
+                            onClick={() => setSummaryHeading(h)}
+                            className={`rounded-full px-2.5 py-1 text-xs border transition-colors ${summaryHeading === h ? "bg-primary-600 text-white border-primary-600" : "bg-white text-gray-600 border-gray-300 hover:border-gray-400"}`}
+                          >
+                            {h}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-lg border border-gray-200 p-4 space-y-3">
+                <p className="text-sm font-medium text-gray-900">Unterschriften</p>
+                <label className="flex items-center gap-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={includeEmployerSignature}
+                    onChange={(e) => setIncludeEmployerSignature(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span className="text-sm text-gray-700">Arbeitgeber ({companyName.trim() || "Firma"})</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={includeEmployeeSignature}
+                    onChange={(e) => setIncludeEmployeeSignature(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span className="text-sm text-gray-700">Arbeitnehmer ({employeeFullName || "Mitarbeiter"})</span>
+                </label>
+
+                {extraSignatures.map((sig, i) => (
+                  <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
+                    <input
+                      type="text"
+                      value={sig.label}
+                      onChange={(e) => {
+                        const next = [...extraSignatures];
+                        next[i] = { ...next[i], label: e.target.value };
+                        setExtraSignatures(next);
+                      }}
+                      placeholder="Name / Organisation"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                    />
+                    <input
+                      type="text"
+                      value={sig.sublabel}
+                      onChange={(e) => {
+                        const next = [...extraSignatures];
+                        next[i] = { ...next[i], sublabel: e.target.value };
+                        setExtraSignatures(next);
+                      }}
+                      placeholder="Rolle"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setExtraSignatures(extraSignatures.filter((_, idx) => idx !== i))}
+                      className="rounded-lg p-1.5 text-red-500 hover:bg-red-50"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={() => setExtraSignatures([...extraSignatures, { label: "", sublabel: "" }])}
+                  className="inline-flex items-center gap-1.5 text-sm text-primary-600 hover:text-primary-700 font-medium"
+                >
+                  <Plus className="h-4 w-4" /> Weitere Person hinzufügen
+                </button>
               </div>
 
               <div>

@@ -160,10 +160,11 @@ function escapeString(str: string): string {
 
 function buildSummaryHtml(data: {
   documentRows: Array<{ startPage: number; endPage: number; name: string }>;
-  employeeFullName: string;
-  companyName: string;
+  heading: string;
   signingCity: string;
   signingDate: string;
+  signatures: Array<{ label: string; sublabel?: string }>;
+  agreementText?: string;
 }): string {
   const rows = data.documentRows
     .map((row, i) => {
@@ -172,22 +173,30 @@ function buildSummaryHtml(data: {
         <tr>
           <td style="padding: 4pt 12pt 4pt 0; font-size: 11pt;">${i + 1}.</td>
           <td style="padding: 4pt 16pt 4pt 0; font-size: 11pt;">${pageRange}</td>
-          <td style="padding: 4pt 0; font-size: 11pt;">${escapeHtml(row.name)}</td>
+          <td style="padding: 4pt 0; font-size: 11pt;">${escapeString(row.name)}</td>
         </tr>`;
     })
     .join("");
 
   const cityDateLine = data.signingCity
-    ? `${escapeHtml(data.signingCity)}, den ${data.signingDate}`
+    ? `${escapeString(data.signingCity)}, den ${data.signingDate}`
     : `den ${data.signingDate}`;
+
+  const signatureCells = data.signatures.map((sig) => {
+    const sub = sig.sublabel ? `br\n      <span style="font-size: 10pt; color: #555;">(${escapeString(sig.sublabel)})` : "";
+    return `
+    <td style="width: ${Math.floor(100 / data.signatures.length)}%; vertical-align: top; padding: 6pt 8pt 0 0; border-top: 1pt solid #333; font-size: 11pt;">
+      ${escapeString(sig.label)}${sub}</span>
+    </td>`;
+  }).join("");
 
   return buildFullHtml(
     `
 <h2 style="font-size: 13pt; font-weight: bold; margin: 0 0 20pt 0; letter-spacing: 0.05em; text-transform: uppercase;">
-  Bestätigung zum Arbeitsvertrag
+  ${escapeString(data.heading)}
 </h2>
 
-<p style="margin: 0 0 16pt 0; font-size: 11pt;">Der Arbeitsvertrag beinhaltet folgende Dokumente:</p>
+<p style="margin: 0 0 16pt 0; font-size: 11pt;">Der Vertrag beinhaltet folgende Dokumente:</p>
 
 <table style="border-collapse: collapse; margin-bottom: 28pt; width: auto;">
   <thead>
@@ -202,23 +211,13 @@ function buildSummaryHtml(data: {
   </tbody>
 </table>
 
-<p style="margin: 0 0 48pt 0; font-size: 11pt;">
-  Beide Parteien stimmen über den Inhalt der Vereinbarungen überein.
-</p>
+${data.agreementText ? `<p style="margin: 0 0 48pt 0; font-size: 11pt;">${escapeString(data.agreementText)}</p>` : ""}
 
 <p style="margin: 0 0 64pt 0; font-size: 11pt;">${cityDateLine}</p>
 
 <table style="width: 90%; border-collapse: collapse;">
   <tr>
-    <td style="width: 44%; vertical-align: top; padding-top: 6pt; border-top: 1pt solid #333; font-size: 11pt;">
-      ${escapeHtml(data.companyName)}<br>
-      <span style="font-size: 10pt; color: #555;">(Arbeitgeber)</span>
-    </td>
-    <td style="width: 12%;"></td>
-    <td style="width: 44%; vertical-align: top; padding-top: 6pt; border-top: 1pt solid #333; font-size: 11pt;">
-      ${escapeHtml(data.employeeFullName)}<br>
-      <span style="font-size: 10pt; color: #555;">(Arbeitnehmer)</span>
-    </td>
+    ${signatureCells}
   </tr>
 </table>
 `,
@@ -235,6 +234,10 @@ export async function generateDocumentGroupPdf(
     pageNumbers?: boolean;
     title?: string;
     employeeFullName: string;
+    includeSummaryPage?: boolean;
+    summaryHeading?: string;
+    signatures?: Array<{ label: string; sublabel?: string }>;
+    agreementText?: string;
   }
 ): Promise<Buffer> {
   const buffers: Buffer[] = [];
@@ -249,23 +252,33 @@ export async function generateDocumentGroupPdf(
     pageCounts.push(pageCount);
   }
 
-  let cumulativePage = 1;
-  const documentRows = pageCounts.map((count, i) => {
-    const startPage = cumulativePage;
-    const endPage = cumulativePage + count - 1;
-    cumulativePage += count;
-    return { startPage, endPage, name: options.title || `Teil ${i + 1}` };
-  });
+  if (options.includeSummaryPage ?? true) {
+    let cumulativePage = 1;
+    const documentRows = pageCounts.map((count, i) => {
+      const startPage = cumulativePage;
+      const endPage = cumulativePage + count - 1;
+      cumulativePage += count;
+      return { startPage, endPage, name: options.title || `Teil ${i + 1}` };
+    });
 
-  const summaryHtml = buildSummaryHtml({
-    documentRows,
-    employeeFullName: options.employeeFullName,
-    companyName: options.companyName,
-    signingCity: options.signingCity ?? "",
-    signingDate: new Date().toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }),
-  });
-  const summaryBuffer = await renderHtmlToPdf(summaryHtml, { format: "A4", printBackground: true });
-  buffers.push(summaryBuffer);
+    const signatures = options.signatures?.length
+      ? options.signatures
+      : [
+          { label: options.companyName, sublabel: "Arbeitgeber" },
+          { label: options.employeeFullName, sublabel: "Arbeitnehmer" },
+        ];
+
+    const summaryHtml = buildSummaryHtml({
+      documentRows,
+      heading: options.summaryHeading || "Bestätigung zum Arbeitsvertrag",
+      signingCity: options.signingCity ?? "",
+      signingDate: new Date().toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }),
+      signatures,
+      agreementText: options.agreementText,
+    });
+    const summaryBuffer = await renderHtmlToPdf(summaryHtml, { format: "A4", printBackground: true });
+    buffers.push(summaryBuffer);
+  }
 
   return mergePdfs(buffers, options.pageNumbers ?? false);
 }
