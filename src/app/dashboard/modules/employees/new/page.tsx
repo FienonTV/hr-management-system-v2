@@ -17,6 +17,7 @@ export default function NewEmployeePage() {
   const [userRoleIds, setUserRoleIds] = useState<string[]>([]);
   const [createdTemporaryPassword, setCreatedTemporaryPassword] = useState<string | null>(null);
   const [createdEmployeeId, setCreatedEmployeeId] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     getRoles().then(setRoles).catch(console.error);
@@ -26,33 +27,49 @@ export default function NewEmployeePage() {
     event.preventDefault();
     setLoading(true);
     setError(null);
+    setFieldErrors({});
 
     const form = event.currentTarget;
     const formData = new FormData(form);
+    const firstName = String(formData.get("firstName") ?? "").trim();
+    const lastName = String(formData.get("lastName") ?? "").trim();
+    const email = String(formData.get("email") ?? "").trim();
+
+    const errors: Record<string, string> = {};
+    if (!firstName) errors.firstName = "Vorname ist ein Pflichtfeld.";
+    if (!lastName) errors.lastName = "Nachname ist ein Pflichtfeld.";
+    if (createUser && !email) errors.email = "E-Mail ist Pflicht, wenn ein Benutzer-Account angelegt wird.";
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setLoading(false);
+      return;
+    }
+
     const data = {
-      employeeNumber: String(formData.get("employeeNumber") ?? "") || undefined,
-      firstName: String(formData.get("firstName") ?? ""),
-      lastName: String(formData.get("lastName") ?? ""),
-      email: String(formData.get("email") ?? "") || undefined,
-      phone: String(formData.get("phone") ?? "") || undefined,
-      position: String(formData.get("position") ?? "") || undefined,
-      department: String(formData.get("department") ?? "") || undefined,
-      employmentType: (String(formData.get("employmentType") ?? "") || undefined) as CreateEmployeeInput["employmentType"],
-      status: (String(formData.get("status") ?? "") || undefined) as CreateEmployeeInput["status"],
-      birthDate: String(formData.get("birthDate") ?? "") || undefined,
-      gender: (String(formData.get("gender") ?? "") || undefined) as CreateEmployeeInput["gender"],
-      startDate: String(formData.get("startDate") ?? "") || undefined,
-      street: String(formData.get("street") ?? "") || undefined,
-      zip: String(formData.get("zip") ?? "") || undefined,
-      city: String(formData.get("city") ?? "") || undefined,
-      country: String(formData.get("country") ?? "") || undefined,
-      taxId: String(formData.get("taxId") ?? "") || undefined,
-      socialSecurityNumber: String(formData.get("socialSecurityNumber") ?? "") || undefined,
-      iban: String(formData.get("iban") ?? "") || undefined,
-      bic: String(formData.get("bic") ?? "") || undefined,
-      emergencyContactName: String(formData.get("emergencyContactName") ?? "") || undefined,
-      emergencyContactPhone: String(formData.get("emergencyContactPhone") ?? "") || undefined,
-      notes: String(formData.get("notes") ?? "") || undefined,
+      employeeNumber: String(formData.get("employeeNumber") ?? "").trim() || undefined,
+      firstName,
+      lastName,
+      email: email || undefined,
+      phone: String(formData.get("phone") ?? "").trim() || undefined,
+      position: String(formData.get("position") ?? "").trim() || undefined,
+      department: String(formData.get("department") ?? "").trim() || undefined,
+      employmentType: (String(formData.get("employmentType") ?? "").trim() || undefined) as CreateEmployeeInput["employmentType"],
+      status: (String(formData.get("status") ?? "").trim() || undefined) as CreateEmployeeInput["status"],
+      birthDate: String(formData.get("birthDate") ?? "").trim() || undefined,
+      gender: (String(formData.get("gender") ?? "").trim() || undefined) as CreateEmployeeInput["gender"],
+      startDate: String(formData.get("startDate") ?? "").trim() || undefined,
+      street: String(formData.get("street") ?? "").trim() || undefined,
+      zip: String(formData.get("zip") ?? "").trim() || undefined,
+      city: String(formData.get("city") ?? "").trim() || undefined,
+      country: String(formData.get("country") ?? "").trim() || undefined,
+      taxId: String(formData.get("taxId") ?? "").trim() || undefined,
+      socialSecurityNumber: String(formData.get("socialSecurityNumber") ?? "").trim() || undefined,
+      iban: String(formData.get("iban") ?? "").trim() || undefined,
+      bic: String(formData.get("bic") ?? "").trim() || undefined,
+      emergencyContactName: String(formData.get("emergencyContactName") ?? "").trim() || undefined,
+      emergencyContactPhone: String(formData.get("emergencyContactPhone") ?? "").trim() || undefined,
+      notes: String(formData.get("notes") ?? "").trim() || undefined,
       createUserAccount: createUser,
       userRoleIds: createUser ? userRoleIds : undefined,
     };
@@ -143,29 +160,39 @@ export default function NewEmployeePage() {
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           <div className="space-y-2">
             <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
-              Vorname
+              Vorname <span className="text-red-500">*</span>
             </label>
             <input
               id="firstName"
               name="firstName"
               type="text"
               required
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className={`w-full rounded-lg border px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+                fieldErrors.firstName ? "border-red-500 ring-1 ring-red-500" : "border-gray-300"
+              }`}
               placeholder="Vorname"
             />
+            {fieldErrors.firstName && (
+              <p className="text-sm text-red-600">{fieldErrors.firstName}</p>
+            )}
           </div>
           <div className="space-y-2">
             <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">
-              Nachname
+              Nachname <span className="text-red-500">*</span>
             </label>
             <input
               id="lastName"
               name="lastName"
               type="text"
               required
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className={`w-full rounded-lg border px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+                fieldErrors.lastName ? "border-red-500 ring-1 ring-red-500" : "border-gray-300"
+              }`}
               placeholder="Nachname"
             />
+            {fieldErrors.lastName && (
+              <p className="text-sm text-red-600">{fieldErrors.lastName}</p>
+            )}
           </div>
         </div>
 
@@ -198,16 +225,21 @@ export default function NewEmployeePage() {
 
         <div className="space-y-2">
           <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-            E-Mail
+            E-Mail {createUser && <span className="text-red-500">*</span>}
           </label>
           <input
             id="email"
             name="email"
             type="email"
             required={createUser}
-            className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className={`w-full rounded-lg border px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+              fieldErrors.email ? "border-red-500 ring-1 ring-red-500" : "border-gray-300"
+            }`}
             placeholder="E-Mail"
           />
+          {fieldErrors.email && (
+            <p className="text-sm text-red-600">{fieldErrors.email}</p>
+          )}
         </div>
 
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
