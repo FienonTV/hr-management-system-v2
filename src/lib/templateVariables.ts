@@ -186,6 +186,28 @@ export const AVAILABLE_VARIABLES: { key: string; label: string; group?: string }
   // Firma / Zeit
   { key: "firmenname", label: "Firmenname", group: "Firma" },
   { key: "datum", label: "Heutiges Datum", group: "Firma" },
+  { key: "heute", label: "Heutiges Datum", group: "Firma" },
+
+  // Legacy Englisch
+  { key: "firstName", label: "Vorname", group: "Legacy" },
+  { key: "lastName", label: "Nachname", group: "Legacy" },
+  { key: "employeeNumber", label: "Mitarbeiternummer", group: "Legacy" },
+  { key: "birthDate", label: "Geburtsdatum", group: "Legacy" },
+  { key: "position_en", label: "Position", group: "Legacy" },
+  { key: "department_en", label: "Abteilung", group: "Legacy" },
+  { key: "email_en", label: "E-Mail", group: "Legacy" },
+  { key: "phone_en", label: "Telefon", group: "Legacy" },
+  { key: "startDate", label: "Eintrittsdatum", group: "Legacy" },
+  { key: "exitDate", label: "Austrittsdatum", group: "Legacy" },
+  { key: "street", label: "Straße", group: "Legacy" },
+  { key: "zipCode", label: "PLZ", group: "Legacy" },
+  { key: "city", label: "Stadt", group: "Legacy" },
+  { key: "country", label: "Land", group: "Legacy" },
+  { key: "socialSecurityNumber", label: "SV-Nummer", group: "Legacy" },
+  { key: "taxId", label: "Steuer-ID", group: "Legacy" },
+  { key: "healthInsurance", label: "Krankenversicherung", group: "Legacy" },
+  { key: "today", label: "Heutiges Datum", group: "Legacy" },
+  { key: "tenantName", label: "Firmenname", group: "Legacy" },
 ];
 
 /**
