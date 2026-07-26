@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Download, Search, Filter, BellOff, AlertTriangle, Clock, CheckCircle2, FileText } from "lucide-react";
+import { Download, Search, Filter, BellOff, AlertTriangle, Clock, CheckCircle2, FileText, Trash2 } from "lucide-react";
 import { getAllDocuments, snoozeDocument } from "@/lib/actions/employeeDocuments";
+import { deleteFile } from "@/lib/actions/files";
 import type { File as FileRecord } from "@prisma/client";
 
 type DocumentListItem = FileRecord & {
@@ -64,6 +65,16 @@ export default function DocumentsPage() {
     const result = await snoozeDocument(fileId, until.toISOString());
     if (!result.success) {
       setError((result as { error?: string }).error || "Snooze fehlgeschlagen");
+      return;
+    }
+    setDocuments((prev) => prev.filter((d) => d.id !== fileId));
+  }
+
+  async function handleDelete(fileId: string) {
+    if (!confirm("Dokument wirklich in den Papierkorb verschieben?")) return;
+    const result = await deleteFile(fileId);
+    if (!result.success) {
+      setError(result.error || "Löschen fehlgeschlagen");
       return;
     }
     setDocuments((prev) => prev.filter((d) => d.id !== fileId));
@@ -179,6 +190,13 @@ export default function DocumentsPage() {
                   >
                     <FileText className="h-4 w-4" />
                   </Link>
+                  <button
+                    onClick={() => handleDelete(doc.id)}
+                    className="rounded-lg p-2 text-gray-500 hover:bg-red-50 hover:text-red-600"
+                    title="In Papierkorb verschieben"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </div>
               </li>
             ))}
