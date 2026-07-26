@@ -173,16 +173,16 @@ export default function DocumentsTab({
       <form onSubmit={handleUpload} className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-medium text-gray-900">Dokument hochladen</h3>
-          {templates.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowTemplateModal(true)}
-              className="flex items-center space-x-2 rounded-lg bg-secondary-100 px-3 py-2 text-sm font-medium text-secondary-700 hover:bg-secondary-200"
-            >
-              <FileStack className="h-4 w-4" />
-              <span>Aus Vorlage generieren</span>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setShowTemplateModal(true)}
+            disabled={templates.length === 0}
+            title={templates.length === 0 ? "Bitte zuerst unter Admin > Dokumentenvorlagen eine Vorlage anlegen" : "Dokument aus Vorlage generieren"}
+            className="flex items-center space-x-2 rounded-lg bg-primary-100 px-3 py-2 text-sm font-medium text-primary-700 hover:bg-primary-200 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <FileStack className="h-4 w-4" />
+            <span>Aus Vorlage generieren</span>
+          </button>
         </div>
 
         {error && <div className="rounded-md bg-red-50 p-4 text-sm text-red-600">{error}</div>}
