@@ -465,13 +465,14 @@ export default function GroupGenerateDocumentModal({
                 )}
               </div>
 
-              <div className="rounded-lg border border-gray-200 p-4 space-y-3">
+              <div className={`rounded-lg border border-gray-200 p-4 space-y-3 transition-opacity ${includeSummaryPage ? "" : "opacity-50 pointer-events-none"}`}>
                 <p className="text-sm font-medium text-gray-900">Unterschriften</p>
                 <label className="flex items-center gap-3 cursor-pointer select-none">
                   <input
                     type="checkbox"
-                    checked={includeEmployerSignature}
+                    checked={includeSummaryPage && includeEmployerSignature}
                     onChange={(e) => setIncludeEmployerSignature(e.target.checked)}
+                    disabled={!includeSummaryPage}
                     className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                   />
                   <span className="text-sm text-gray-700">Arbeitgeber ({companyName.trim() || "Firma"})</span>
@@ -479,14 +480,15 @@ export default function GroupGenerateDocumentModal({
                 <label className="flex items-center gap-3 cursor-pointer select-none">
                   <input
                     type="checkbox"
-                    checked={includeEmployeeSignature}
+                    checked={includeSummaryPage && includeEmployeeSignature}
                     onChange={(e) => setIncludeEmployeeSignature(e.target.checked)}
+                    disabled={!includeSummaryPage}
                     className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                   />
                   <span className="text-sm text-gray-700">Arbeitnehmer ({employeeFullName || "Mitarbeiter"})</span>
                 </label>
 
-                {extraSignatures.map((sig, i) => (
+                {includeSummaryPage && extraSignatures.map((sig, i) => (
                   <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
                     <input
                       type="text"
