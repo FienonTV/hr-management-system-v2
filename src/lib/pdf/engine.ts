@@ -1,5 +1,5 @@
 import puppeteer from "puppeteer";
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, rgb } from "pdf-lib";
 import { getStorageAdapter } from "../storage";
 
 export interface PdfOptions {
@@ -147,6 +147,153 @@ export async function renderTemplateToPdf(
 export function extractVariables(template: string): string[] {
   const matches = template.match(/\{\{(\w+)\}\}/g) ?? [];
   return Array.from(new Set(matches.map((m) => m.replace(/\{\{|\}\}/g, ""))));
+}
+
+function escapeString(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function buildSummaryHtml(data: {
+  documentRows: Array<{ startPage: number; endPage: number; name: string }>;
+  employeeFullName: string;
+  companyName: string;
+  signingCity: string;
+  signingDate: string;
+}): string {
+  const rows = data.documentRows
+    .map((row, i) => {
+      const pageRange = row.startPage === row.endPage ? `${row.startPage}` : `${row.startPage}–${row.endPage}`;
+      return `
+        <tr>
+          <td style="padding: 4pt 12pt 4pt 0; font-size: 11pt;">${i + 1}.</td>
+          <td style="padding: 4pt 16pt 4pt 0; font-size: 11pt;">${pageRange}</td>
+          <td style="padding: 4pt 0; font-size: 11pt;">${escapeHtml(row.name)}</td>
+        </tr>`;
+    })
+    .join("");
+
+  const cityDateLine = data.signingCity
+    ? `${escapeHtml(data.signingCity)}, den ${data.signingDate}`
+    : `den ${data.signingDate}`;
+
+  return buildFullHtml(
+    `
+<h2 style="font-size: 13pt; font-weight: bold; margin: 0 0 20pt 0; letter-spacing: 0.05em; text-transform: uppercase;">
+  Bestätigung zum Arbeitsvertrag
+</h2>
+
+<p style="margin: 0 0 16pt 0; font-size: 11pt;">Der Arbeitsvertrag beinhaltet folgende Dokumente:</p>
+
+<table style="border-collapse: collapse; margin-bottom: 28pt; width: auto;">
+  <thead>
+    <tr>
+      <th style="text-align: left; padding: 4pt 12pt 6pt 0; font-size: 11pt; border-bottom: 1pt solid #333; font-weight: bold;"></th>
+      <th style="text-align: left; padding: 4pt 16pt 6pt 0; font-size: 11pt; border-bottom: 1pt solid #333; font-weight: bold;">Seite</th>
+      <th style="text-align: left; padding: 4pt 0 6pt 0; font-size: 11pt; border-bottom: 1pt solid #333; font-weight: bold;">Dokument</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${rows}
+  </tbody>
+</table>
+
+<p style="margin: 0 0 48pt 0; font-size: 11pt;">
+  Beide Parteien stimmen über den Inhalt der Vereinbarungen überein.
+</p>
+
+<p style="margin: 0 0 64pt 0; font-size: 11pt;">${cityDateLine}</p>
+
+<table style="width: 90%; border-collapse: collapse;">
+  <tr>
+    <td style="width: 44%; vertical-align: top; padding-top: 6pt; border-top: 1pt solid #333; font-size: 11pt;">
+      ${escapeHtml(data.companyName)}<br>
+      <span style="font-size: 10pt; color: #555;">(Arbeitgeber)</span>
+    </td>
+    <td style="width: 12%;"></td>
+    <td style="width: 44%; vertical-align: top; padding-top: 6pt; border-top: 1pt solid #333; font-size: 11pt;">
+      ${escapeHtml(data.employeeFullName)}<br>
+      <span style="font-size: 10pt; color: #555;">(Arbeitnehmer)</span>
+    </td>
+  </tr>
+</table>
+`,
+    {}
+  );
+}
+
+export async function generateDocumentGroupPdf(
+  templateContents: string[],
+  context: RenderContext,
+  options: {
+    companyName: string;
+    signingCity?: string;
+    pageNumbers?: boolean;
+    title?: string;
+    employeeFullName: string;
+  }
+): Promise<Buffer> {
+  const buffers: Buffer[] = [];
+  const pageCounts: number[] = [];
+
+  for (const content of templateContents) {
+    const substituted = substituteVariables(content, context);
+    const html = buildFullHtml(substituted, {});
+    const buf = await renderHtmlToPdf(html, { format: "A4", printBackground: true });
+    const pageCount = (await PDFDocument.load(buf)).getPageCount();
+    buffers.push(buf);
+    pageCounts.push(pageCount);
+  }
+
+  let cumulativePage = 1;
+  const documentRows = pageCounts.map((count, i) => {
+    const startPage = cumulativePage;
+    const endPage = cumulativePage + count - 1;
+    cumulativePage += count;
+    return { startPage, endPage, name: options.title || `Teil ${i + 1}` };
+  });
+
+  const summaryHtml = buildSummaryHtml({
+    documentRows,
+    employeeFullName: options.employeeFullName,
+    companyName: options.companyName,
+    signingCity: options.signingCity ?? "",
+    signingDate: new Date().toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }),
+  });
+  const summaryBuffer = await renderHtmlToPdf(summaryHtml, { format: "A4", printBackground: true });
+  buffers.push(summaryBuffer);
+
+  return mergePdfs(buffers, options.pageNumbers ?? false);
+}
+
+async function mergePdfs(buffers: Buffer[], addPageNumbers: boolean): Promise<Buffer> {
+  const merged = await PDFDocument.create();
+  let currentPage = 1;
+
+  for (const buf of buffers) {
+    const doc = await PDFDocument.load(buf);
+    const copiedPages = await merged.copyPages(doc, doc.getPageIndices());
+    for (const page of copiedPages) {
+      merged.addPage(page);
+      if (addPageNumbers) {
+        // pdf-lib drawing happens on the added page reference; page numbers added simply
+        const { width, height } = page.getSize();
+        page.drawText(String(currentPage), {
+          x: width - 40,
+          y: 20,
+          size: 9,
+          color: rgb(0.4, 0.4, 0.4),
+        });
+      }
+      currentPage++;
+    }
+  }
+
+  return Buffer.from(await merged.save());
 }
 
 export function buildEmployeeContext(

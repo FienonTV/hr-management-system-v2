@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Upload, Download, Trash2, FileStack, X, History, Plus } from "lucide-react";
+import { Upload, Download, Trash2, FileStack, X, History, Plus, FolderPlus } from "lucide-react";
 import { listFiles, deleteFile, uploadNewVersion, getFileVersions } from "@/lib/actions/files";
+import GroupGenerateDocumentModal from "@/components/templates/GroupGenerateDocumentModal";
 import { getDocumentCategories } from "@/lib/actions/documentCategories";
 import {
   getDocumentTemplates,
@@ -45,6 +46,7 @@ export default function DocumentsTab({
   const [versionFile, setVersionFile] = useState<FileItem | null>(null);
   const [versions, setVersions] = useState<FileItem[]>([]);
   const [uploadingVersion, setUploadingVersion] = useState(false);
+  const [showGroupModal, setShowGroupModal] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -230,6 +232,17 @@ export default function DocumentsTab({
       <form onSubmit={handleUpload} className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-medium text-gray-900">Dokument hochladen</h3>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowGroupModal(true)}
+            disabled={templates.length === 0}
+            title={templates.length === 0 ? "Bitte zuerst unter Admin > Dokumentenvorlagen eine Vorlage anlegen" : "Dokumentengruppe aus mehreren Vorlagen erstellen"}
+            className="flex items-center space-x-2 rounded-lg bg-primary-100 px-3 py-2 text-sm font-medium text-primary-700 hover:bg-primary-200 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <FolderPlus className="h-4 w-4" />
+            <span>Dokumentengruppe</span>
+          </button>
           <button
             type="button"
             onClick={() => setShowTemplateModal(true)}
@@ -240,6 +253,7 @@ export default function DocumentsTab({
             <FileStack className="h-4 w-4" />
             <span>Aus Vorlage generieren</span>
           </button>
+        </div>
         </div>
 
         {error && <div className="rounded-md bg-red-50 p-4 text-sm text-red-600">{error}</div>}
@@ -619,6 +633,19 @@ export default function DocumentsTab({
             </form>
           </div>
         </div>
+      )}
+      {showGroupModal && (
+        <GroupGenerateDocumentModal
+          isOpen={showGroupModal}
+          onClose={() => setShowGroupModal(false)}
+          onSuccess={() => {
+            setShowGroupModal(false);
+            reloadFiles();
+          }}
+          employeeId={employeeId}
+          employeeFullName={`${employee.firstName ?? ""} ${employee.lastName ?? ""}`.trim()}
+          employeeCity={typeof employee.address === "object" && employee.address !== null ? (employee.address as Record<string, unknown>).city as string | null : null}
+        />
       )}
     </div>
   );

@@ -11,7 +11,7 @@ import {
   buildVariableMap,
   AVAILABLE_VARIABLES,
 } from "@/lib/templateVariables";
-import { renderHtmlToPdf } from "@/lib/pdf/engine";
+import { renderHtmlToPdf, generateDocumentGroupPdf } from "@/lib/pdf/engine";
 import { getStorageAdapter } from "@/lib/storage";
 import { randomUUID } from "node:crypto";
 import { createHash } from "node:crypto";
@@ -281,4 +281,149 @@ export async function getTemplateCustomVariables(templateId: string): Promise<{
   if (!template) return { success: false, error: "Vorlage nicht gefunden" };
 
   return { success: true, variables: extractCustomVariables(template.content) };
+}
+
+export async function getTemplateCustomVariablesForMany(
+  templateIds: string[]
+): Promise<{ success: boolean; variables?: Record<string, string[]>; error?: string }> {
+  const { tenantId } = await requirePermission("documents:read");
+
+  const templates = await prismaAdmin.documentTemplate.findMany({
+    where: { id: { in: templateIds }, tenantId, isActive: true },
+  });
+
+  const result: Record<string, string[]> = {};
+  for (const t of templates) {
+    result[t.id] = extractCustomVariables(t.content);
+  }
+
+  return { success: true, variables: result };
+}
+
+export async function generateDocumentGroup(
+  employeeId: string,
+  options: {
+    templateIds: string[];
+    customVariables: Record<string, Record<string, string>>;
+    title?: string;
+    expiresAt?: string;
+    notes?: string;
+    categoryIds?: string[];
+    companyName: string;
+    signingCity?: string;
+    pageNumbers?: boolean;
+  }
+) {
+  const { tenantId, session } = await requirePermission("documents:generate");
+  const userId = session.user.id;
+
+  const [templates, employee, tenant] = await Promise.all([
+    prismaAdmin.documentTemplate.findMany({
+      where: { id: { in: options.templateIds }, tenantId, isActive: true },
+      include: { category: true },
+    }),
+    prismaAdmin.employee.findFirst({
+      where: { id: employeeId, tenantId },
+    }),
+    prismaAdmin.tenant.findUnique({
+      where: { id: tenantId },
+      select: { name: true },
+    }),
+  ]);
+
+  if (!employee) return { success: false, error: "Mitarbeiter nicht gefunden" };
+
+  const templateMap = new Map(templates.map((t) => [t.id, t]));
+  const orderedTemplates: typeof templates = [];
+  for (const id of options.templateIds) {
+    const t = templateMap.get(id);
+    if (t) orderedTemplates.push(t);
+  }
+
+  if (orderedTemplates.length !== options.templateIds.length) {
+    return { success: false, error: "Eine oder mehrere Vorlagen nicht gefunden" };
+  }
+
+  // Validate custom variables are present for each template
+  for (const t of orderedTemplates) {
+    const keys = extractCustomVariables(t.content);
+    const values = options.customVariables[t.id] ?? {};
+    const missing = keys.filter((k) => !(k in values));
+    if (missing.length > 0) {
+      return {
+        success: false,
+        error: `Bitte Werte für "${t.name}" angeben: ${missing.join(", ")}`,
+      };
+    }
+  }
+
+  const baseContext = buildVariableMap(
+    employee as unknown as Parameters<typeof buildVariableMap>[0],
+    tenant?.name ?? ""
+  );
+
+  const pdfBuffer = await generateDocumentGroupPdf(
+    orderedTemplates.map((t) => t.content),
+    baseContext,
+    {
+      companyName: options.companyName,
+      signingCity: options.signingCity,
+      pageNumbers: options.pageNumbers,
+      title: options.title,
+      employeeFullName: `${employee.firstName} ${employee.lastName}`,
+    }
+  );
+
+  const fileId = randomUUID();
+  const title = options.title || orderedTemplates[0]?.name || "Dokumentengruppe";
+  const sanitizedName = `${title.replace(/[^a-zA-Z0-9._-\u00C0-\u017F\s]/g, "_")}_${employee.lastName}.pdf`;
+  const storageKey = `${tenantId}/${fileId}/${sanitizedName}`;
+
+  await getStorageAdapter().upload(storageKey, pdfBuffer, "application/pdf");
+  const checksum = createHash("sha256").update(pdfBuffer).digest("hex");
+
+  const created = await withTenant(tenantId, async (tx) => {
+    return tx.file.create({
+      data: {
+        id: fileId,
+        tenantId,
+        uploadedById: userId,
+        employeeId,
+        parentType: "documentTemplateGroup",
+        parentId: null,
+        originalName: sanitizedName,
+        storageKey,
+        mimeType: "application/pdf",
+        sizeBytes: pdfBuffer.length,
+        checksum,
+        isPublic: false,
+        category: "DOCUMENT",
+        title,
+        notes: options.notes || null,
+        expiresAt: options.expiresAt ? new Date(options.expiresAt) : null,
+        version: 1,
+        isLatestVersion: true,
+        documentCategories: {
+          create: (options.categoryIds ?? []).map((categoryId) => ({ categoryId })),
+        },
+      },
+    });
+  });
+
+  await logAudit({
+    tenantId,
+    userId,
+    action: "document.group.generate",
+    resourceType: "file",
+    resourceId: created.id,
+    metadata: {
+      templateIds: options.templateIds,
+      templateNames: orderedTemplates.map((t) => t.name).join(", "),
+      employeeId,
+      sizeBytes: created.sizeBytes,
+    },
+  });
+
+  revalidatePath("/dashboard/modules/employees/[id]", "page");
+  return { success: true, fileId: created.id };
 }
