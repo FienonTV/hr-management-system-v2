@@ -9,7 +9,7 @@ export interface PdfOptions {
   marginBottom?: string;
   marginLeft?: string;
   marginRight?: string;
-  letterheadPath?: string; // PNG/JPG background applied to every page
+  letterheadPath?: string; // PNG/JPG/PDF background applied to every page
   format?: "A4" | "A3" | "A5" | "Letter" | "Legal";
   landscape?: boolean;
   printBackground?: boolean;
@@ -123,7 +123,6 @@ async function applyLetterhead(pdfBuffer: Buffer, letterheadPath: string): Promi
       const targetPage = basePdf.getPage(i);
       const letterheadPage = copiedPages[i] ?? copiedPages[0];
       if (!letterheadPage) continue;
-      // Embed the letterhead page as a form XObject and draw it full-page behind content.
       const embedded = await basePdf.embedPage(letterheadPage);
       const pageSize = targetPage.getSize();
       targetPage.drawPage(embedded, {
@@ -179,14 +178,17 @@ function escapeString(str: string): string {
     .replace(/'/g, "&#39;");
 }
 
-function buildSummaryHtml(data: {
-  documentRows: Array<{ startPage: number; endPage: number; name: string }>;
-  heading: string;
-  signingCity: string;
-  signingDate: string;
-  signatures: Array<{ label: string; sublabel?: string }>;
-  agreementText?: string;
-}): string {
+function buildSummaryHtml(
+  data: {
+    documentRows: Array<{ startPage: number; endPage: number; name: string }>;
+    heading: string;
+    signingCity: string;
+    signingDate: string;
+    signatures: Array<{ label: string; sublabel?: string }>;
+    agreementText?: string;
+  },
+  options: PdfOptions = {}
+): string {
   const rows = data.documentRows
     .map((row, i) => {
       const pageRange = row.startPage === row.endPage ? `${row.startPage}` : `${row.startPage}–${row.endPage}`;
@@ -204,7 +206,8 @@ function buildSummaryHtml(data: {
     : `den ${data.signingDate}`;
 
   const signatureCells = data.signatures.map((sig) => {
-    const sub = sig.sublabel ? `br\n      <span style="font-size: 10pt; color: #555;">(${escapeString(sig.sublabel)})` : "";
+    const sub = sig.sublabel ? `<br/>
+      <span style="font-size: 10pt; color: #555;">(${escapeString(sig.sublabel)})` : "";
     return `
     <td style="width: ${Math.floor(100 / data.signatures.length)}%; vertical-align: top; padding: 6pt 8pt 0 0; border-top: 1pt solid #333; font-size: 11pt;">
       ${escapeString(sig.label)}${sub}</span>
@@ -242,7 +245,7 @@ ${data.agreementText ? `<p style="margin: 0 0 48pt 0; font-size: 11pt;">${escape
   </tr>
 </table>
 `,
-    {}
+    options
   );
 }
 
@@ -259,15 +262,18 @@ export async function generateDocumentGroupPdf(
     summaryHeading?: string;
     signatures?: Array<{ label: string; sublabel?: string }>;
     agreementText?: string;
+    pdfOptions?: PdfOptions;
   }
 ): Promise<Buffer> {
   const buffers: Buffer[] = [];
   const pageCounts: number[] = [];
 
+  const pdfOptions = options.pdfOptions ?? {};
+
   for (const content of templateContents) {
     const substituted = substituteVariables(content, context);
-    const html = buildFullHtml(substituted, {});
-    const buf = await renderHtmlToPdf(html, { format: "A4", printBackground: true });
+    const html = buildFullHtml(substituted, pdfOptions);
+    const buf = await renderHtmlToPdf(html, { format: "A4", printBackground: true, ...pdfOptions });
     const pageCount = (await PDFDocument.load(buf)).getPageCount();
     buffers.push(buf);
     pageCounts.push(pageCount);
@@ -296,8 +302,8 @@ export async function generateDocumentGroupPdf(
       signingDate: new Date().toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }),
       signatures,
       agreementText: options.agreementText,
-    });
-    const summaryBuffer = await renderHtmlToPdf(summaryHtml, { format: "A4", printBackground: true });
+    }, pdfOptions);
+    const summaryBuffer = await renderHtmlToPdf(summaryHtml, { format: "A4", printBackground: true, ...pdfOptions });
     buffers.push(summaryBuffer);
   }
 
@@ -314,7 +320,6 @@ async function mergePdfs(buffers: Buffer[], addPageNumbers: boolean): Promise<Bu
     for (const page of copiedPages) {
       merged.addPage(page);
       if (addPageNumbers) {
-        // pdf-lib drawing happens on the added page reference; page numbers added simply
         const { width, height } = page.getSize();
         page.drawText(String(currentPage), {
           x: width - 40,
@@ -359,7 +364,6 @@ export function buildEmployeeContext(
   add("startDate", employee.startDate);
   add("birthDate", employee.birthDate);
 
-  // Address fields from JSON address column
   if (typeof employee.address === "object" && employee.address !== null) {
     const addr = employee.address as Record<string, unknown>;
     add("street", addr.street);

@@ -17,6 +17,15 @@ import { getLetterheadSettings } from "@/lib/actions/tenantSettings";
 import { randomUUID } from "node:crypto";
 import { createHash } from "node:crypto";
 
+function escapeHtml(value: string | null | undefined): string {
+  if (value == null) return "";
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 export async function getDocumentTemplates(includeInactive = false) {
   const { tenantId } = await requirePermission("documents:read");
 
@@ -369,7 +378,7 @@ export async function generateDocumentGroup(
   const { tenantId, session } = await requirePermission("documents:generate");
   const userId = session.user.id;
 
-  const [templates, employee, tenant] = await Promise.all([
+  const [templates, employee, tenant, letterhead] = await Promise.all([
     prismaAdmin.documentTemplate.findMany({
       where: { id: { in: options.templateIds }, tenantId, isActive: true },
       include: { category: true },
@@ -381,6 +390,7 @@ export async function generateDocumentGroup(
       where: { id: tenantId },
       select: { name: true },
     }),
+    getLetterheadSettings(),
   ]);
 
   if (!employee) return { success: false, error: "Mitarbeiter nicht gefunden" };
@@ -414,6 +424,37 @@ export async function generateDocumentGroup(
     tenant?.name ?? ""
   );
 
+  const title = options.title?.trim() || orderedTemplates[0]?.name || "Dokumentengruppe";
+  const sanitizedName = `${title.replace(/[^a-zA-Z0-9._-\u00C0-\u017F\s]/g, "_")}_${employee.lastName}.pdf`;
+
+  const headerHtml =
+    letterhead.mode === "build"
+      ? `<div style="font-size: 9px; color: #666;">${escapeHtml(letterhead.companyName)}<br/>${escapeHtml(letterhead.addressLine1)}${letterhead.addressLine2 ? `<br/>${escapeHtml(letterhead.addressLine2)}` : ""}</div>`
+      : undefined;
+  const footerHtml = letterhead.mode === "build" ? letterhead.footerText || undefined : undefined;
+  const letterheadPath =
+    letterhead.mode === "upload" && letterhead.backgroundFileId
+      ? (await prismaAdmin.file.findFirst({
+          where: { id: letterhead.backgroundFileId, tenantId },
+          select: { storageKey: true },
+        }))?.storageKey ?? undefined
+      : letterhead.mode === "build" && letterhead.logoFileId
+        ? (await prismaAdmin.file.findFirst({
+            where: { id: letterhead.logoFileId, tenantId },
+            select: { storageKey: true },
+          }))?.storageKey ?? undefined
+        : undefined;
+
+  const pdfOptions = {
+    marginTop: letterhead.marginTop,
+    marginBottom: letterhead.marginBottom,
+    marginLeft: letterhead.marginLeft,
+    marginRight: letterhead.marginRight,
+    headerHtml,
+    footerHtml,
+    letterheadPath,
+  };
+
   const pdfBuffer = await generateDocumentGroupPdf(
     orderedTemplates.map((t) => t.content),
     baseContext,
@@ -421,18 +462,17 @@ export async function generateDocumentGroup(
       companyName: options.companyName,
       signingCity: options.signingCity,
       pageNumbers: options.pageNumbers,
-      title: options.title,
+      title,
       employeeFullName: `${employee.firstName} ${employee.lastName}`,
       includeSummaryPage: options.includeSummaryPage,
       summaryHeading: options.summaryHeading,
       signatures: options.signatures,
       agreementText: options.agreementText,
+      pdfOptions,
     }
   );
 
   const fileId = randomUUID();
-  const title = options.title || orderedTemplates[0]?.name || "Dokumentengruppe";
-  const sanitizedName = `${title.replace(/[^a-zA-Z0-9._-\u00C0-\u017F\s]/g, "_")}_${employee.lastName}.pdf`;
   const storageKey = `${tenantId}/${fileId}/${sanitizedName}`;
 
   await getStorageAdapter().upload(storageKey, pdfBuffer, "application/pdf");
