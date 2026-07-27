@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useRef } from "react";
 import { Upload, FileImage } from "lucide-react";
-import { updateLetterheadSettings, type LetterheadSettings } from "@/lib/actions/tenantSettings";
-import { validateUploadFile } from "@/lib/uploadValidation";
+import { saveLetterheadSettings, type LetterheadSettings } from "@/lib/actions/tenantSettings";
 
 const ALLOWED_LOGO_TYPES = ["image/png", "image/jpeg", "image/jpg"];
 const ALLOWED_BACKGROUND_TYPES = ["application/pdf", "image/png", "image/jpeg", "image/jpg"];
@@ -16,93 +15,77 @@ interface LetterheadFormProps {
 
 export default function LetterheadForm({ initial }: LetterheadFormProps) {
   const [settings, setSettings] = useState(initial);
-  const [logoFile, setLogoFile] = useState<File | null>(null);
-  const [backgroundFile, setBackgroundFile] = useState<File | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-
-  function validate(file: File | null | undefined, allowedTypes: string[], maxSize: number, label: string): string | null {
-    if (!file) return null;
-    const validation = validateUploadFile(file);
-    if (!validation.valid) return validation.error;
-    if (!allowedTypes.includes(file.type)) return `${label} muss ${allowedTypes.includes("application/pdf") ? "PDF oder Bild" : "PNG oder JPEG"} sein.`;
-    if (file.size > maxSize) return `${label} darf maximal ${maxSize / 1024 / 1024} MB groß sein.`;
-    return null;
-  }
-
-  function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    const err = validate(file, ALLOWED_LOGO_TYPES, MAX_LOGO_SIZE, "Logo");
-    if (err) {
-      setMessage({ type: "error", text: err });
-      setLogoFile(null);
-      return;
-    }
-    setLogoFile(file ?? null);
-    setMessage(null);
-  }
-
-  function handleBackgroundChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    const err = validate(file, ALLOWED_BACKGROUND_TYPES, MAX_BACKGROUND_SIZE, "Briefpapier");
-    if (err) {
-      setMessage({ type: "error", text: err });
-      setBackgroundFile(null);
-      return;
-    }
-    setBackgroundFile(file ?? null);
-    setMessage(null);
-  }
-
-  const upload = useCallback(async (file: File | null): Promise<string | null> => {
-    if (!file) return null;
-    const form = new FormData();
-    form.append("file", file);
-    form.append("category", "AVATAR");
-    const resp = await fetch("/api/files", { method: "POST", body: form });
-    const data = await resp.json();
-    if (!resp.ok) throw new Error(data.error || "Upload fehlgeschlagen");
-    return data.fileId as string;
-  }, []);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setSaving(true);
-    setMessage(null);
-    try {
-      const [logoFileId, backgroundFileId] = await Promise.all([
-        upload(logoFile),
-        upload(backgroundFile),
-      ]);
-      const result = await updateLetterheadSettings({
-        ...settings,
-        logoFileId: logoFileId ?? settings.logoFileId,
-        backgroundFileId: backgroundFileId ?? settings.backgroundFileId,
-      });
-      if (result.success) {
-        setSettings((s) => ({
-          ...s,
-          logoFileId: logoFileId ?? s.logoFileId,
-          backgroundFileId: backgroundFileId ?? s.backgroundFileId,
-        }));
-        setLogoFile(null);
-        setBackgroundFile(null);
-        setMessage({ type: "success", text: "Briefpapier-Einstellungen gespeichert." });
-      } else {
-        setMessage({ type: "error", text: result.error || "Speichern fehlgeschlagen." });
-      }
-    } catch (err) {
-      setMessage({ type: "error", text: err instanceof Error ? err.message : "Fehler" });
-    } finally {
-      setSaving(false);
-    }
-  }
+  const formRef = useRef<HTMLFormElement>(null);
 
   const isBuild = settings.mode === "build";
   const isUpload = settings.mode === "upload";
 
+  function validateFile(
+    file: File | null | undefined,
+    allowedTypes: string[],
+    maxSize: number,
+    label: string
+  ): string | null {
+    if (!file || file.size === 0) return null;
+    if (!allowedTypes.includes(file.type)) {
+      return `${label} muss ${allowedTypes.includes("application/pdf") ? "PDF oder Bild" : "PNG oder JPEG"} sein.`;
+    }
+    if (file.size > maxSize) {
+      return `${label} darf maximal ${maxSize / 1024 / 1024} MB groß sein.`;
+    }
+    return null;
+  }
+
+  async function handleSubmit(formData: FormData) {
+    setPending(true);
+    setMessage(null);
+
+    const logo = formData.get("logoFile") as File | null;
+    const background = formData.get("backgroundFile") as File | null;
+    const mode = String(formData.get("mode") || "build");
+
+    const logoError = isBuild ? validateFile(logo, ALLOWED_LOGO_TYPES, MAX_LOGO_SIZE, "Logo") : null;
+    const backgroundError = isUpload
+      ? validateFile(background, ALLOWED_BACKGROUND_TYPES, MAX_BACKGROUND_SIZE, "Briefpapier")
+      : null;
+
+    if (logoError || backgroundError) {
+      setMessage({ type: "error", text: logoError || backgroundError || "Datei ungültig" });
+      setPending(false);
+      return;
+    }
+
+    // For fields not included as inputs, append current values.
+    formData.set("companyName", settings.companyName);
+    formData.set("addressLine1", settings.addressLine1);
+    formData.set("addressLine2", settings.addressLine2);
+    formData.set("footerText", settings.footerText);
+    formData.set("marginTop", settings.marginTop);
+    formData.set("marginBottom", settings.marginBottom);
+    formData.set("marginLeft", settings.marginLeft);
+    formData.set("marginRight", settings.marginRight);
+
+    try {
+      const result = await saveLetterheadSettings(formData);
+      if (result.success) {
+        setMessage({ type: "success", text: "Briefpapier-Einstellungen gespeichert." });
+        formRef.current?.reset();
+      } else {
+        setMessage({ type: "error", text: result.error || "Speichern fehlgeschlagen." });
+      }
+    } catch (err) {
+      setMessage({ type: "error", text: err instanceof Error ? err.message : "Fehler beim Speichern." });
+    } finally {
+      setPending(false);
+    }
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <form ref={formRef} action={handleSubmit} className="space-y-5">
+      <input type="hidden" name="mode" value={settings.mode} />
+
       <div className="flex space-x-4">
         <label className="flex cursor-pointer items-center space-x-2 rounded-lg border border-gray-300 bg-white px-4 py-2">
           <input
@@ -131,8 +114,8 @@ export default function LetterheadForm({ initial }: LetterheadFormProps) {
       {isUpload && (
         <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
           <p className="text-sm text-gray-600">
-            Lade ein fertiges Briefpapier hoch (PDF oder Bild). Es wird unverändert auf jede Seite gelegt. Die Seitenränder
-            verschieben nur den Text.
+            Lade ein fertiges Briefpapier hoch (PDF oder Bild). Es wird unverändert auf jede Seite gelegt. Die
+            Seitenränder verschieben nur den Text.
           </p>
           <div className="mt-3 flex items-center space-x-4">
             <label className="flex cursor-pointer items-center space-x-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium hover:bg-gray-50">
@@ -140,13 +123,12 @@ export default function LetterheadForm({ initial }: LetterheadFormProps) {
               <span>Briefpapier hochladen</span>
               <input
                 type="file"
+                name="backgroundFile"
                 accept="application/pdf,image/png,image/jpeg"
-                onChange={handleBackgroundChange}
                 className="hidden"
               />
             </label>
-            {backgroundFile && <span className="text-sm text-gray-600">{backgroundFile.name}</span>}
-            {settings.backgroundFileId && !backgroundFile && (
+            {settings.backgroundFileId && (
               <span className="inline-flex items-center text-sm text-green-600">
                 <FileImage className="mr-1 h-4 w-4" /> Briefpapier hinterlegt
               </span>
@@ -156,17 +138,16 @@ export default function LetterheadForm({ initial }: LetterheadFormProps) {
       )}
 
       {isBuild && (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 rounded-lg border border-gray-200 bg-gray-50 p-4">
+        <div className="grid grid-cols-1 gap-5 rounded-lg border border-gray-200 bg-gray-50 p-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <label className="block text-sm font-medium text-gray-700">Logo (PNG/JPEG, max. 2 MB)</label>
             <div className="mt-1 flex items-center space-x-4">
               <label className="flex cursor-pointer items-center space-x-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium hover:bg-gray-50">
                 <Upload className="h-4 w-4" />
                 <span>Logo hochladen</span>
-                <input type="file" accept="image/png,image/jpeg" onChange={handleLogoChange} className="hidden" />
+                <input type="file" name="logoFile" accept="image/png,image/jpeg" className="hidden" />
               </label>
-              {logoFile && <span className="text-sm text-gray-600">{logoFile.name}</span>}
-              {settings.logoFileId && !logoFile && (
+              {settings.logoFileId && (
                 <span className="inline-flex items-center text-sm text-green-600">
                   <FileImage className="mr-1 h-4 w-4" /> Logo hinterlegt
                 </span>
@@ -221,26 +202,26 @@ export default function LetterheadForm({ initial }: LetterheadFormProps) {
       )}
 
       <div className="grid grid-cols-2 gap-5 sm:grid-cols-4">
-        {
-          ([
+        {(
+          [
             { id: "marginTop" as const, label: "Oben", placeholder: "20mm" },
             { id: "marginBottom" as const, label: "Unten", placeholder: "20mm" },
             { id: "marginLeft" as const, label: "Links", placeholder: "20mm" },
             { id: "marginRight" as const, label: "Rechts", placeholder: "20mm" },
-          ] as const).map(({ id, label, placeholder }) => (
-            <div key={id}>
-              <label htmlFor={id} className="block text-sm font-medium text-gray-700">{label}er Rand</label>
-              <input
-                id={id}
-                type="text"
-                value={settings[id]}
-                onChange={(e) => setSettings((s) => ({ ...s, [id]: e.target.value }))}
-                placeholder={placeholder}
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-              />
-            </div>
-          ))
-        }
+          ] as const
+        ).map(({ id, label, placeholder }) => (
+          <div key={id}>
+            <label htmlFor={id} className="block text-sm font-medium text-gray-700">{label}er Rand</label>
+            <input
+              id={id}
+              type="text"
+              value={settings[id]}
+              onChange={(e) => setSettings((s) => ({ ...s, [id]: e.target.value }))}
+              placeholder={placeholder}
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+            />
+          </div>
+        ))}
       </div>
 
       {message && (
@@ -255,10 +236,10 @@ export default function LetterheadForm({ initial }: LetterheadFormProps) {
 
       <button
         type="submit"
-        disabled={saving}
+        disabled={pending}
         className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
       >
-        {saving ? "Speichern..." : "Briefpapier speichern"}
+        {pending ? "Speichern..." : "Briefpapier speichern"}
       </button>
     </form>
   );

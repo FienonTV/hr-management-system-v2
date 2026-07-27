@@ -3,8 +3,9 @@
 import { withTenant } from "@/lib/db/tenant";
 import { requirePermission } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
+import { prismaAdmin } from "@/lib/db/prisma";
+import { uploadFile } from "./files";
 import { revalidatePath } from "next/cache";
-
 export async function getTenantSettings() {
   const { tenantId } = await requirePermission("settings:read");
   return withTenant(tenantId, async (tx) => {
@@ -181,6 +182,95 @@ export async function updateLetterheadSettings(
       resourceType: "tenantSetting",
       resourceId: "letterhead",
       metadata: { keys: entries.map(([key]) => key) },
+    });
+
+    revalidatePath("/dashboard/modules/admin/settings");
+    return { success: true };
+  });
+}
+
+export async function saveLetterheadSettings(formData: FormData): Promise<{ success: boolean; error?: string }> {
+  const { tenantId, session } = await requirePermission("settings:update");
+
+  const modeRaw = String(formData.get("mode") || "build");
+  const mode = modeRaw === "upload" || modeRaw === "build" ? modeRaw : "build";
+  const logo = formData.get("logoFile") as File | null;
+  const background = formData.get("backgroundFile") as File | null;
+
+  const baseSettings: LetterheadSettings = {
+    mode,
+    backgroundFileId: null,
+    logoFileId: null,
+    companyName: String(formData.get("companyName") || ""),
+    addressLine1: String(formData.get("addressLine1") || ""),
+    addressLine2: String(formData.get("addressLine2") || ""),
+    footerText: String(formData.get("footerText") || ""),
+    marginTop: String(formData.get("marginTop") || "20mm"),
+    marginBottom: String(formData.get("marginBottom") || "20mm"),
+    marginLeft: String(formData.get("marginLeft") || "20mm"),
+    marginRight: String(formData.get("marginRight") || "20mm"),
+  };
+
+  return withTenant(tenantId, async (tx) => {
+    let logoFileId: string | null = null;
+    if (logo && logo.size > 0) {
+      const result = await uploadFile(logo, { category: "DOCUMENT", title: "Briefpapier-Logo" });
+      if (!result.success) {
+        throw new Error("Logo-Upload fehlgeschlagen" + ("error" in result ? `: ${result.error}` : ""));
+      }
+      logoFileId = result.fileId;
+    }
+
+    let backgroundFileId: string | null = null;
+    if (background && background.size > 0) {
+      const result = await uploadFile(background, { category: "DOCUMENT", title: "Briefpapier-Hintergrund" });
+      if (!result.success) {
+        throw new Error("Briefpapier-Upload fehlgeschlagen" + ("error" in result ? `: ${result.error}` : ""));
+      }
+      backgroundFileId = result.fileId;
+    }
+
+    // Preserve existing file ids if no new file was uploaded.
+    const existing = await tx.tenantSetting.findMany({
+      where: { tenantId, key: { in: ["letterhead.logoFileId", "letterhead.backgroundFileId"] } },
+    });
+    const existingMap = new Map<string, string | null>(
+      existing.map((s) => [s.key, s.value])
+    );
+    const finalLogoFileId =
+      logoFileId ?? (existingMap.get("letterhead.logoFileId") as string | null) ?? null;
+    const finalBackgroundFileId =
+      backgroundFileId ?? (existingMap.get("letterhead.backgroundFileId") as string | null) ?? null;
+
+    const entries: [string, string | null][] = [
+      ["letterhead.mode", mode],
+      ["letterhead.logoFileId", finalLogoFileId],
+      ["letterhead.backgroundFileId", finalBackgroundFileId],
+      ["letterhead.companyName", baseSettings.companyName || null],
+      ["letterhead.addressLine1", baseSettings.addressLine1 || null],
+      ["letterhead.addressLine2", baseSettings.addressLine2 || null],
+      ["letterhead.footerText", baseSettings.footerText || null],
+      ["letterhead.marginTop", baseSettings.marginTop],
+      ["letterhead.marginBottom", baseSettings.marginBottom],
+      ["letterhead.marginLeft", baseSettings.marginLeft],
+      ["letterhead.marginRight", baseSettings.marginRight],
+    ];
+
+    for (const [key, value] of entries) {
+      await tx.tenantSetting.upsert({
+        where: { tenantId_key: { tenantId, key } },
+        update: { value: value ?? "", updatedById: session.user.id },
+        create: { tenantId, key, value: value ?? "", updatedById: session.user.id },
+      });
+    }
+
+    await logAudit({
+      tenantId,
+      userId: session.user.id,
+      action: "tenant.letterheadUpdate",
+      resourceType: "tenantSetting",
+      resourceId: "letterhead",
+      metadata: { mode, hasLogo: !!finalLogoFileId, hasBackground: !!finalBackgroundFileId },
     });
 
     revalidatePath("/dashboard/modules/admin/settings");
