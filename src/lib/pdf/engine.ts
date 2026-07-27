@@ -115,6 +115,7 @@ async function applyLetterhead(pdfBuffer: Buffer, letterheadPath: string): Promi
   if (!letterheadBytes) return pdfBuffer;
 
   const lowerPath = letterheadPath.toLowerCase();
+  const pageSize = basePdf.getPage(0).getSize();
 
   if (lowerPath.endsWith(".pdf")) {
     const letterheadPdf = await PDFDocument.load(Buffer.from(letterheadBytes));
@@ -123,13 +124,21 @@ async function applyLetterhead(pdfBuffer: Buffer, letterheadPath: string): Promi
       const targetPage = basePdf.getPage(i);
       const letterheadPage = copiedPages[i] ?? copiedPages[0];
       if (!letterheadPage) continue;
+
       const embedded = await basePdf.embedPage(letterheadPage);
-      const pageSize = targetPage.getSize();
+      const embeddedSize = embedded.size();
+      const scale = Math.max(
+        pageSize.width / embeddedSize.width,
+        pageSize.height / embeddedSize.height
+      );
+      const scaledWidth = embeddedSize.width * scale;
+      const scaledHeight = embeddedSize.height * scale;
+
       targetPage.drawPage(embedded, {
-        x: 0,
-        y: 0,
-        width: pageSize.width,
-        height: pageSize.height,
+        x: (pageSize.width - scaledWidth) / 2,
+        y: (pageSize.height - scaledHeight) / 2,
+        width: scaledWidth,
+        height: scaledHeight,
       });
     }
   } else {
@@ -138,14 +147,17 @@ async function applyLetterhead(pdfBuffer: Buffer, letterheadPath: string): Promi
       : await basePdf.embedJpg(letterheadBytes);
 
     const { width, height } = letterheadImage.size();
+    const scale = Math.max(pageSize.width / width, pageSize.height / height);
+    const scaledWidth = width * scale;
+    const scaledHeight = height * scale;
 
     for (const page of basePdf.getPages()) {
       const pageSize = page.getSize();
       page.drawImage(letterheadImage, {
-        x: 0,
-        y: 0,
-        width: pageSize.width,
-        height: pageSize.width * (height / width),
+        x: (pageSize.width - scaledWidth) / 2,
+        y: (pageSize.height - scaledHeight) / 2,
+        width: scaledWidth,
+        height: scaledHeight,
         opacity: 1,
       });
     }
