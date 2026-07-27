@@ -6,6 +6,8 @@ import { logAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
 import { prismaAdmin } from "@/lib/db/prisma";
 
+export type DocumentCategory = Awaited<ReturnType<typeof prismaAdmin.documentCategory.findMany>>[number];
+
 export async function getDocumentCategories(includeInactive = false) {
   const { tenantId, session } = await requirePermission("documents:read");
 
