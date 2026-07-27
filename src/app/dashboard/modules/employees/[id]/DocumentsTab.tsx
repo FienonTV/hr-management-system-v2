@@ -74,6 +74,14 @@ export default function DocumentsTab({
       if (tmplResult.success) setTemplates(tmplResult.templates);
     }
     load();
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        load();
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [employeeId]);
 
   async function reloadDocuments() {
