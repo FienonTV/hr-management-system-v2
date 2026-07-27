@@ -3,9 +3,14 @@
 import { withTenant } from "@/lib/db/tenant";
 import { requirePermission } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
-import { prismaAdmin } from "@/lib/db/prisma";
 import { uploadFile } from "./files";
 import { revalidatePath } from "next/cache";
+
+const ALLOWED_LOGO_TYPES = ["image/png", "image/jpeg", "image/jpg"];
+const ALLOWED_BACKGROUND_TYPES = ["application/pdf", "image/png", "image/jpeg", "image/jpg"];
+const MAX_LOGO_SIZE = 2 * 1024 * 1024;
+const MAX_BACKGROUND_SIZE = 10 * 1024 * 1024;
+
 export async function getTenantSettings() {
   const { tenantId } = await requirePermission("settings:read");
   return withTenant(tenantId, async (tx) => {
@@ -30,9 +35,7 @@ export async function updateTenantSetting(
     }
 
     await tx.tenantSetting.upsert({
-      where: {
-        tenantId_key: { tenantId, key },
-      },
+      where: { tenantId_key: { tenantId, key } },
       update: { value, updatedById: session.user.id },
       create: {
         tenantId,
@@ -214,6 +217,12 @@ export async function saveLetterheadSettings(formData: FormData): Promise<{ succ
   return withTenant(tenantId, async (tx) => {
     let logoFileId: string | null = null;
     if (logo && logo.size > 0) {
+      if (!ALLOWED_LOGO_TYPES.includes(logo.type)) {
+        throw new Error("Logo muss PNG oder JPEG sein.");
+      }
+      if (logo.size > MAX_LOGO_SIZE) {
+        throw new Error("Logo darf maximal 2 MB groß sein.");
+      }
       const result = await uploadFile(logo, { category: "DOCUMENT", title: "Briefpapier-Logo" });
       if (!result.success) {
         throw new Error("Logo-Upload fehlgeschlagen" + ("error" in result ? `: ${result.error}` : ""));
@@ -223,6 +232,12 @@ export async function saveLetterheadSettings(formData: FormData): Promise<{ succ
 
     let backgroundFileId: string | null = null;
     if (background && background.size > 0) {
+      if (!ALLOWED_BACKGROUND_TYPES.includes(background.type)) {
+        throw new Error("Briefbogen muss PDF, PNG oder JPEG sein.");
+      }
+      if (background.size > MAX_BACKGROUND_SIZE) {
+        throw new Error("Briefbogen darf maximal 10 MB groß sein.");
+      }
       const result = await uploadFile(background, { category: "DOCUMENT", title: "Briefpapier-Hintergrund" });
       if (!result.success) {
         throw new Error("Briefpapier-Upload fehlgeschlagen" + ("error" in result ? `: ${result.error}` : ""));
@@ -234,9 +249,7 @@ export async function saveLetterheadSettings(formData: FormData): Promise<{ succ
     const existing = await tx.tenantSetting.findMany({
       where: { tenantId, key: { in: ["letterhead.logoFileId", "letterhead.backgroundFileId"] } },
     });
-    const existingMap = new Map<string, string | null>(
-      existing.map((s) => [s.key, s.value])
-    );
+    const existingMap = new Map<string, string | null>(existing.map((s) => [s.key, s.value]));
     const finalLogoFileId =
       logoFileId ?? (existingMap.get("letterhead.logoFileId") as string | null) ?? null;
     const finalBackgroundFileId =
