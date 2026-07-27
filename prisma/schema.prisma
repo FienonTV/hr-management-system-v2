@@ -30,7 +30,6 @@ model Tenant {
   roles               Role[]
   employees           Employee[]
   invitationTokens    InvitationToken[]
-  employmentContracts EmploymentContract[]
   documentCategories DocumentCategory[]
   documentTemplates  DocumentTemplate[]
 
@@ -411,7 +410,6 @@ model Employee {
 
   tenant      Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   userAccount User?
-  contracts   EmploymentContract[]
   files       File[]
 
   @@unique([tenantId, employeeNumber])
@@ -420,40 +418,6 @@ model Employee {
   @@index([tenantId, department])
   @@index([tenantId, lastName])
   @@map("employees")
-}
-
-enum ContractType {
-  PERMANENT
-  FIXED_TERM
-  MINIJOB
-  WORKER
-
-  @@map("contract_type")
-}
-
-model EmploymentContract {
-  id           String       @id @default(cuid())
-  tenantId     String       @map("tenant_id")
-  employeeId   String       @map("employee_id")
-  title        String
-  contractType ContractType @map("contract_type")
-  startDate    DateTime     @map("start_date")
-  endDate      DateTime?    @map("end_date")
-  weeklyHours  Float?       @map("weekly_hours")
-  salaryJson   String?      @map("salary_json")
-  notes        String?
-  isDeleted    Boolean      @default(false)
-  deletedAt    DateTime?    @map("deleted_at")
-  deletedById  String?      @map("deleted_by_id")
-  createdAt    DateTime     @default(now()) @map("created_at")
-  updatedAt    DateTime     @updatedAt @map("updated_at")
-
-  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-
-  @@index([tenantId])
-  @@index([tenantId, employeeId])
-  @@map("employment_contracts")
 }
 
 // ------------------------------------------------------------------

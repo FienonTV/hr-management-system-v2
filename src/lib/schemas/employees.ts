@@ -74,16 +74,6 @@ export const createEmployeeSchema = employeeBaseSchema.extend({
 
 export const updateEmployeeSchema = employeeBaseSchema;
 
-export const employmentContractSchema = z.object({
-  title: z.string().trim().min(1).max(255),
-  contractType: z.enum(["PERMANENT", "FIXED_TERM", "MINIJOB", "WORKER"]),
-  startDate: z.union([z.string(), z.date()]).transform((v) => new Date(v)),
-  endDate: z.union([z.string(), z.date()]).optional().transform((v) => (v ? new Date(v) : undefined)),
-  weeklyHours: z.coerce.number().min(0).max(168).optional(),
-  salaryJson: z.string().max(5000).optional(),
-  notes: z.string().trim().max(2000).optional(),
-});
-
 export type AddressInput = z.infer<typeof addressSchema>;
 export type SensitiveDataInput = z.infer<typeof sensitiveDataSchema>;
 
@@ -126,8 +116,6 @@ export interface CreateEmployeeInput extends EmployeeBaseInput {
 }
 
 export type UpdateEmployeeInput = Partial<EmployeeBaseInput>;
-
-export type EmploymentContractInput = z.infer<typeof employmentContractSchema>;
 
 export function parseCreateEmployeeInput(data: CreateEmployeeInput) {
   return createEmployeeSchema.parse(data);

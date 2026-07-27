@@ -2,19 +2,16 @@
 import { auth } from "@/lib/auth";
 import { Employee } from "@prisma/client";
 import Link from "next/link";
-import { Plus, Edit, User, Search, Eye } from "lucide-react";
+import { Plus, User, Search } from "lucide-react";
 import { redirect } from "next/navigation";
-
-function initials(emp: Employee) {
-  return `${emp.firstName?.charAt(0) ?? ""}${emp.lastName?.charAt(0) ?? ""}`.toUpperCase();
-}
+import EmployeeRow from "./EmployeeRow";
 
 export default async function EmployeesPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
   try {
-    const employees = (await getEmployees()) as Employee[];
+    const employees = (await getEmployees()) as (Employee & { userAccount?: { id: string } | null })[];
 
     return (
       <div className="space-y-6">
@@ -72,89 +69,7 @@ export default async function EmployeesPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200 bg-white">
                   {employees.map((employee) => (
-                    <tr key={employee.id} className="hover:bg-gray-50 group relative">
-                      <td className="whitespace-nowrap px-6 py-4">
-                        <Link
-                          href={`/dashboard/modules/employees/${employee.id}`}
-                          className="absolute inset-0 z-0"
-                          aria-hidden="true"
-                          tabIndex={-1}
-                        />
-                        <div className="relative z-10 flex items-center">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-100">
-                            <span className="text-sm font-medium text-primary-600">{initials(employee)}</span>
-                          </div>
-                          <div className="ml-4">
-                            <div className="text-sm font-medium text-gray-900 group-hover:text-primary-600 transition-colors">
-                              {employee.firstName} {employee.lastName}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {employee.employeeNumber || "Ohne Mitarbeiternummer"}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="relative z-10 whitespace-nowrap px-6 py-4 text-sm text-gray-900">{employee.email || '-'}</td>
-                      <td className="relative z-10 whitespace-nowrap px-6 py-4 text-sm text-gray-900">{employee.position || '-'}</td>
-                      <td className="relative z-10 whitespace-nowrap px-6 py-4 text-sm text-gray-900">{employee.department || '-'}</td>
-                      <td className="relative z-10 whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                        <span
-                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                            employee.status === "ACTIVE"
-                              ? "bg-green-100 text-green-800"
-                              : employee.status === "ONBOARDING"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : employee.status === "TERMINATED"
-                                  ? "bg-red-100 text-red-800"
-                                  : "bg-gray-100 text-gray-800"
-                          }`}
-                        >
-                          {employee.status === "ACTIVE"
-                            ? "Aktiv"
-                            : employee.status === "INACTIVE"
-                              ? "Inaktiv"
-                              : employee.status === "ONBOARDING"
-                                ? "Einstellung"
-                                : employee.status === "TERMINATED"
-                                  ? "Ausgetreten"
-                                  : employee.status}
-                        </span>
-                      </td>
-                      <td className="relative z-10 whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                        {employee.startDate
-                          ? new Date(employee.startDate).toLocaleDateString("de-DE")
-                          : '-'}
-                      </td>
-                      <td className="relative z-10 whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                        {('userAccount' in employee && employee.userAccount) ? (
-                          <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
-                            Aktiv
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">
-                            Kein Account
-                          </span>
-                        )}
-                      </td>
-                      <td className="relative z-20 whitespace-nowrap px-6 py-4 text-right text-sm">
-                        <div className="flex items-center justify-end space-x-2">
-                          <Link
-                            href={`/dashboard/modules/employees/${employee.id}`}
-                            className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-primary-600"
-                            title="Ansehen"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Link>
-                          <Link
-                            href={`/dashboard/modules/employees/${employee.id}/edit`}
-                            className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-primary-600"
-                            title="Bearbeiten"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Link>
-                        </div>
-                      </td>
-                    </tr>
+                    <EmployeeRow key={employee.id} employee={employee} />
                   ))}
                 </tbody>
               </table>

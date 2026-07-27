@@ -7,11 +7,10 @@ import type { Employee, User } from "@prisma/client";
 import {
   createEmployeeSchema,
   updateEmployeeSchema,
-  employmentContractSchema,
   parseCreateEmployeeInput,
   parseUpdateEmployeeInput,
 } from "@/lib/schemas/employees";
-import type { EmployeeBaseInput, CreateEmployeeInput, UpdateEmployeeInput, EmploymentContractInput } from "@/lib/schemas/employees";
+import type { EmployeeBaseInput, CreateEmployeeInput, UpdateEmployeeInput } from "@/lib/schemas/employees";
 import { logAudit } from "@/lib/audit";
 import { hashPassword, generateTemporaryPassword } from "@/lib/passwordPolicy";
 
@@ -292,111 +291,6 @@ export async function deleteEmployee(id: string): Promise<{ success: boolean; er
       resourceId: id,
     });
 
-    return { success: true };
-  });
-}
-
-// ------------------------------------------------------------------
-// Employment contracts
-// ------------------------------------------------------------------
-
-export async function getEmploymentContracts(employeeId: string) {
-  const { tenantId } = await requirePermission("employees:read");
-  return withTenant(tenantId, async (tx) => {
-    return tx.employmentContract.findMany({
-      where: { tenantId, employeeId, isDeleted: false },
-      orderBy: { startDate: 'desc' },
-    });
-  });
-}
-
-export async function createEmploymentContract(
-  employeeId: string,
-  data: EmploymentContractInput
-): Promise<{ success: boolean; error?: string; contractId?: string }> {
-  const { tenantId, session } = await requirePermission("employees:update");
-  const validated = employmentContractSchema.parse(data);
-
-  return withTenant(tenantId, async (tx) => {
-    const employee = await tx.employee.findUnique({ where: { id: employeeId } });
-    if (!employee || employee.tenantId !== tenantId) {
-      return { success: false, error: "Mitarbeiter nicht gefunden" };
-    }
-
-    const contract = await tx.employmentContract.create({
-      data: { ...validated, tenantId, employeeId },
-    });
-
-    await logAudit({
-      tenantId,
-      userId: session.user.id,
-      action: "employmentContract.create",
-      resourceType: "employmentContract",
-      resourceId: contract.id,
-      metadata: { employeeId },
-    });
-
-    revalidatePath(`/dashboard/modules/employees/${employeeId}`);
-    return { success: true, contractId: contract.id };
-  });
-}
-
-export async function updateEmploymentContract(
-  contractId: string,
-  data: EmploymentContractInput
-): Promise<{ success: boolean; error?: string }> {
-  const { tenantId, session } = await requirePermission("employees:update");
-  const validated = employmentContractSchema.parse(data);
-
-  return withTenant(tenantId, async (tx) => {
-    const existing = await tx.employmentContract.findUnique({ where: { id: contractId } });
-    if (!existing || existing.tenantId !== tenantId) {
-      return { success: false, error: "Vertrag nicht gefunden" };
-    }
-
-    await tx.employmentContract.update({
-      where: { id: contractId },
-      data: validated,
-    });
-
-    await logAudit({
-      tenantId,
-      userId: session.user.id,
-      action: "employmentContract.update",
-      resourceType: "employmentContract",
-      resourceId: contractId,
-      metadata: { employeeId: existing.employeeId },
-    });
-
-    revalidatePath(`/dashboard/modules/employees/${existing.employeeId}`);
-    return { success: true };
-  });
-}
-
-export async function deleteEmploymentContract(contractId: string): Promise<{ success: boolean; error?: string }> {
-  const { tenantId, session } = await requirePermission("employees:update");
-
-  return withTenant(tenantId, async (tx) => {
-    const existing = await tx.employmentContract.findUnique({ where: { id: contractId } });
-    if (!existing || existing.tenantId !== tenantId) {
-      return { success: false, error: "Vertrag nicht gefunden" };
-    }
-
-    await tx.employmentContract.update({
-      where: { id: contractId },
-      data: { isDeleted: true, deletedAt: new Date(), deletedById: session.user.id },
-    });
-
-    await logAudit({
-      tenantId,
-      userId: session.user.id,
-      action: "employmentContract.delete",
-      resourceType: "employmentContract",
-      resourceId: contractId,
-      metadata: { employeeId: existing.employeeId },
-    });
-
-    revalidatePath(`/dashboard/modules/employees/${existing.employeeId}`);
     return { success: true };
   });
 }

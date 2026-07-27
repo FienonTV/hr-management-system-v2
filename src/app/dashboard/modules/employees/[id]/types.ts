@@ -1,4 +1,4 @@
-import type { Employee as PrismaEmployee, EmploymentContract as PrismaContract, File as PrismaFile, User, DocumentCategory as PrismaDocumentCategory } from "@prisma/client";
+import type { Employee as PrismaEmployee, File as PrismaFile, User, DocumentCategory as PrismaDocumentCategory } from "@prisma/client";
 
 export type Employee = Omit<PrismaEmployee, "address" | "sensitiveData"> & {
   address: unknown;
@@ -17,7 +17,7 @@ export type Employee = Omit<PrismaEmployee, "address" | "sensitiveData"> & {
   emergencyContactPhone?: string | null;
 };
 
-export type EmploymentContract = PrismaContract;
+export type EmploymentContract = never;
 
 export type FileItem = PrismaFile;
 
@@ -35,13 +35,4 @@ export type EmployeeUserData = Pick<User, "id" | "tenantId" | "employeeId" | "em
 export type FormState = {
   error?: string;
   success?: string;
-};
-
-export type ContractFormData = {
-  title: string;
-  contractType: PrismaContract["contractType"];
-  startDate: string;
-  endDate?: string;
-  salaryJson?: string;
-  metadata?: string;
 };

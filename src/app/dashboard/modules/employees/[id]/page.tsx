@@ -2,20 +2,18 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ShieldCheck, FileText, ArrowLeft, Briefcase, User, Pencil } from "lucide-react";
-import { getEmployeeById, getEmploymentContracts } from "@/lib/actions/employees";
+import { ShieldCheck, FileText, ArrowLeft, Pencil } from "lucide-react";
+import { getEmployeeById } from "@/lib/actions/employees";
 import { listFiles } from "@/lib/actions/files";
 import ReadOnlyStammdaten from "./ReadOnlyStammdaten";
-import ContractsTab from "./ContractsTab";
 import DocumentsTab from "./DocumentsTab";
 import UserTab from "./UserTab";
-import type { Employee, EmploymentContract, FileItem } from "./types";
+import type { Employee, FileItem } from "./types";
 
-type Tab = "stammdaten" | "vertraege" | "dokumente" | "user";
+type Tab = "stammdaten" | "dokumente" | "user";
 
 export default function EmployeeDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const [employee, setEmployee] = useState<Employee | null>(null);
-  const [contracts, setContracts] = useState<EmploymentContract[]>([]);
   const [files, setFiles] = useState<FileItem[]>([]);
   const [activeTab, setActiveTab] = useState<Tab>("stammdaten");
   const [loading, setLoading] = useState(true);
@@ -26,14 +24,10 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
     async function load() {
       try {
         const { id } = await params;
-        const [empData, contractData] = await Promise.all([
-          getEmployeeById(id),
-          getEmploymentContracts(id),
-        ]);
+        const empData = await getEmployeeById(id);
         if (!cancelled) {
           if (empData) {
             setEmployee(empData);
-            setContracts(contractData);
             const fileResult = await listFiles({ employeeId: id, limit: 100 });
             setFiles(fileResult.files);
           } else {
@@ -68,7 +62,6 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
 
   const tabs = [
     { id: "stammdaten" as Tab, label: "Stammdaten", icon: FileText },
-    { id: "vertraege" as Tab, label: "Verträge", icon: Briefcase },
     { id: "dokumente" as Tab, label: "Dokumente", icon: FileText },
     { id: "user" as Tab, label: "Benutzer-Account", icon: ShieldCheck },
   ];
@@ -120,7 +113,6 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
       </div>
 
       {activeTab === "stammdaten" && <ReadOnlyStammdaten employee={employee} />}
-      {activeTab === "vertraege" && <ContractsTab employeeId={employee.id} contracts={contracts} onChange={setContracts} />}
       {activeTab === "dokumente" && <DocumentsTab employeeId={employee.id} employee={employee} files={files} onFilesChange={setFiles} />}
       {activeTab === "user" && <UserTab employeeId={employee.id} email={employee.email} />}
     </div>
