@@ -421,8 +421,8 @@ export default function DocumentsTab({
                     selected ? "text-white" : "bg-white text-gray-700 hover:bg-gray-50"
                   }`}
                   style={{
-                    backgroundColor: selected ? category.color : undefined,
-                    borderColor: category.color,
+                    backgroundColor: selected ? (category.color || undefined) : undefined,
+                    borderColor: category.color || undefined,
                   }}
                 >
                   {category.name}
@@ -664,8 +664,8 @@ export default function DocumentsTab({
                           selected ? "text-white" : "bg-white text-gray-700 hover:bg-gray-50"
                         }`}
                         style={{
-                          backgroundColor: selected ? category.color : undefined,
-                          borderColor: category.color,
+                          backgroundColor: selected ? (category.color || undefined) : undefined,
+                          borderColor: category.color || undefined,
                         }}
                       >
                         {category.name}
@@ -808,8 +808,8 @@ export default function DocumentsTab({
                           selected ? "text-white" : "bg-white text-gray-700 hover:bg-gray-50"
                         }`}
                         style={{
-                          backgroundColor: selected ? category.color : undefined,
-                          borderColor: category.color,
+                          backgroundColor: selected ? (category.color || undefined) : undefined,
+                          borderColor: category.color || undefined,
                         }}
                       >
                         {category.name}

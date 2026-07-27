@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback, useTransition, useRef } from "react";
+import { useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { Plus, User as UserIcon, Search, X } from "lucide-react";
-import { getEmployees } from "@/lib/actions/employees";
 import EmployeeRow from "./EmployeeRow";
 import type { Employee, User } from "@prisma/client";
 
@@ -11,41 +10,44 @@ type EmployeeWithUser = Employee & { userAccount?: User | null };
 
 interface EmployeesClientProps {
   initialEmployees: EmployeeWithUser[];
-  initialQuery?: string;
 }
 
-export default function EmployeesClient({ initialEmployees, initialQuery = "" }: EmployeesClientProps) {
-  const [query, setQuery] = useState(initialQuery);
-  const [employees, setEmployees] = useState<EmployeeWithUser[]>(initialEmployees);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+function normalizeSearch(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
 
-  const search = useCallback(async (searchTerm: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await getEmployees(searchTerm);
-      setEmployees(result);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Suche fehlgeschlagen");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+function matches(employee: EmployeeWithUser, query: string): boolean {
+  if (!query.trim()) return true;
+  const q = normalizeSearch(query);
+  const haystack = [
+    employee.firstName,
+    employee.lastName,
+    employee.email,
+    employee.employeeNumber,
+    employee.position,
+    employee.department,
+    employee.userAccount?.email,
+    employee.userAccount?.firstName,
+    employee.userAccount?.lastName,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return normalizeSearch(haystack).includes(q);
+}
 
-  useEffect(() => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(() => {
-      startTransition(() => {
-        search(query);
-      });
-    }, 300);
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, [query, search]);
+export default function EmployeesClient({ initialEmployees }: EmployeesClientProps) {
+  const [query, setQuery] = useState("");
+  const [allEmployees] = useState(initialEmployees);
+
+  const filteredEmployees = useMemo(() => {
+    if (!query.trim()) return allEmployees;
+    return allEmployees.filter((e) => matches(e, query));
+  }, [allEmployees, query]);
+
+  const clear = useCallback(() => setQuery(""), []);
 
   return (
     <div className="space-y-6">
@@ -76,7 +78,7 @@ export default function EmployeesClient({ initialEmployees, initialQuery = "" }:
           {query && (
             <button
               type="button"
-              onClick={() => setQuery("")}
+              onClick={clear}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
               title="Suche leeren"
             >
@@ -84,13 +86,10 @@ export default function EmployeesClient({ initialEmployees, initialQuery = "" }:
             </button>
           )}
         </div>
-        {(loading || isPending) && <span className="text-sm text-gray-500">Suche...</span>}
       </div>
 
-      {error && <div className="rounded-md bg-red-50 p-4 text-sm text-red-600">{error}</div>}
-
       <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-        {employees.length === 0 ? (
+        {filteredEmployees.length === 0 ? (
           <div className="flex h-64 flex-col items-center justify-center">
             <UserIcon className="h-12 w-12 text-gray-400" />
             <h3 className="mt-4 text-lg font-medium text-gray-900">Keine Mitarbeiter gefunden</h3>
@@ -112,7 +111,7 @@ export default function EmployeesClient({ initialEmployees, initialQuery = "" }:
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
-                {employees.map((employee) => (
+                {filteredEmployees.map((employee) => (
                   <EmployeeRow key={employee.id} employee={employee} />
                 ))}
               </tbody>
