@@ -113,7 +113,7 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
       </div>
 
       {activeTab === "stammdaten" && <ReadOnlyStammdaten employee={employee} />}
-      {activeTab === "dokumente" && <DocumentsTab employeeId={employee.id} employee={employee} files={files} onFilesChange={setFiles} />}
+      {activeTab === "dokumente" && <DocumentsTab employeeId={employee.id} employee={employee} />}
       {activeTab === "user" && <UserTab employeeId={employee.id} email={employee.email} />}
     </div>
   );

@@ -503,19 +503,22 @@ export default function DocumentsTab({
                       </p>
                       {container.categories.length > 0 && (
                         <div className="mt-1 flex flex-wrap gap-1">
-                          {container.categories.map((category) => (
-                            <span
-                              key={category.id}
-                              className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium"
-                              style={{
-                                backgroundColor: `${category.color}20`,
-                                color: category.color,
-                                border: `1px solid ${category.color}`,
-                              }}
-                            >
-                              {category.name}
-                            </span>
-                          ))}
+                          {container.categories.map((category) => {
+                            const color = category.color || "#6b7280";
+                            return (
+                              <span
+                                key={category.id}
+                                className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium"
+                                style={{
+                                  backgroundColor: `${color}20`,
+                                  color,
+                                  border: `1px solid ${color}`,
+                                }}
+                              >
+                                {category.name}
+                              </span>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
