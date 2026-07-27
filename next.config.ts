@@ -21,6 +21,9 @@ const cspDirectives = [
   .join("; ");
 
 const nextConfig: NextConfig = {
+  serverActions: {
+    bodySizeLimit: "10mb",
+  },
   serverExternalPackages: ["pg", "@prisma/adapter-pg", "bcryptjs"],
   eslint: {
     ignoreDuringBuilds: true,
