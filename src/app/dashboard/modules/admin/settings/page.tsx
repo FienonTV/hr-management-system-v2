@@ -1,12 +1,13 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { getModuleDefinitions, setModuleActive } from "@/lib/actions/modules";
-import { getTenantSettings, updateTenantSetting, deleteTenantSetting } from "@/lib/actions/tenantSettings";
+import { getTenantSettings, updateTenantSetting, deleteTenantSetting, getLetterheadSettings } from "@/lib/actions/tenantSettings";
+import LetterheadForm from "./LetterheadForm";
 
 export default async function AdminSettingsPage() {
-  const [modules, settings] = await Promise.all([
+  const [modules, settings, letterhead] = await Promise.all([
     getModuleDefinitions(),
     getTenantSettings(),
+    getLetterheadSettings(),
   ]);
 
   async function toggleModule(formData: FormData) {
@@ -72,6 +73,16 @@ export default async function AdminSettingsPage() {
               </form>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+        <h2 className="text-lg font-medium text-gray-900">Briefpapier / PDF-Ränder</h2>
+        <p className="mt-1 text-sm text-gray-600">
+          Logo, Adresse, Fußzeile und Ränder für generierte PDF-Dokumente festlegen.
+        </p>
+        <div className="mt-4">
+          <LetterheadForm initial={letterhead} />
         </div>
       </section>
 

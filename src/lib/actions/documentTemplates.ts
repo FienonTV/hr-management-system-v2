@@ -13,6 +13,7 @@ import {
 } from "@/lib/templateVariables";
 import { renderHtmlToPdf, generateDocumentGroupPdf } from "@/lib/pdf/engine";
 import { getStorageAdapter } from "@/lib/storage";
+import { getLetterheadSettings } from "@/lib/actions/tenantSettings";
 import { randomUUID } from "node:crypto";
 import { createHash } from "node:crypto";
 
@@ -175,7 +176,7 @@ export async function generateDocumentFromTemplate(
   const { tenantId, session } = await requirePermission("documents:generate");
   const userId = session.user.id;
 
-  const [template, employee, tenant] = await Promise.all([
+  const [template, employee, tenant, letterhead] = await Promise.all([
     prismaAdmin.documentTemplate.findFirst({
       where: { id: templateId, tenantId, isActive: true },
       include: { category: true },
@@ -187,6 +188,7 @@ export async function generateDocumentFromTemplate(
       where: { id: tenantId },
       select: { name: true },
     }),
+    getLetterheadSettings(),
   ]);
 
   if (!template) return { success: false, error: "Vorlage nicht gefunden" };
@@ -208,9 +210,34 @@ export async function generateDocumentFromTemplate(
   );
 
   const substitutedBody = substituteVariables(template.content, context);
+  const headerHtml = letterhead.companyName
+    ? [
+        letterhead.companyName,
+        letterhead.addressLine1,
+        letterhead.addressLine2,
+      ]
+        .filter(Boolean)
+        .join("<br/>")
+    : undefined;
+  const footerHtml = letterhead.footerText || undefined;
+
+  const logoFile = letterhead.logoFileId
+    ? await prismaAdmin.file.findFirst({
+        where: { id: letterhead.logoFileId, tenantId },
+        select: { storageKey: true },
+      })
+    : null;
+
   const pdfBuffer = await renderHtmlToPdf(substitutedBody, {
     format: "A4",
     printBackground: true,
+    marginTop: letterhead.marginTop,
+    marginBottom: letterhead.marginBottom,
+    marginLeft: letterhead.marginLeft,
+    marginRight: letterhead.marginRight,
+    headerHtml,
+    footerHtml,
+    letterheadPath: logoFile?.storageKey ?? undefined,
   });
 
   const fileId = randomUUID();

@@ -13,6 +13,7 @@ import type { DocumentContainerWithLatest } from "@/lib/actions/employeeDocument
 import type { File as PrismaFile, DocumentCategory as PrismaDocumentCategory } from "@prisma/client";
 import GroupGenerateDocumentModal from "@/components/templates/GroupGenerateDocumentModal";
 import { getDocumentCategories } from "@/lib/actions/documentCategories";
+import { validateUploadFile, uploadHint } from "@/lib/uploadValidation";
 import {
   getDocumentTemplates,
   generateDocumentFromTemplate,
@@ -95,6 +96,13 @@ export default function DocumentsTab({
 
     if (!file || !title) {
       setError("Bitte Datei und Titel angeben");
+      setUploading(false);
+      return;
+    }
+
+    const validation = validateUploadFile(file);
+    if (!validation.valid) {
+      setError(validation.error);
       setUploading(false);
       return;
     }
@@ -197,6 +205,12 @@ export default function DocumentsTab({
     const file = input.files?.[0];
     if (!file) {
       setError("Bitte eine Datei auswählen");
+      return;
+    }
+
+    const validation = validateUploadFile(file);
+    if (!validation.valid) {
+      setError(validation.error);
       return;
     }
 
@@ -389,6 +403,7 @@ export default function DocumentsTab({
               required
               className="w-full rounded-lg border border-gray-300 px-4 py-2.5 file:mr-4 file:rounded-md file:border-0 file:bg-primary-50 file:px-3 file:py-1 file:text-sm file:font-medium file:text-primary-700 hover:file:bg-primary-100"
             />
+            <p className="text-xs text-gray-500">{uploadHint()}</p>
           </div>
           <div className="space-y-2">
             <label htmlFor="category" className="block text-sm font-medium text-gray-700">Dateityp</label>
