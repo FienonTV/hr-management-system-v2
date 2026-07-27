@@ -70,6 +70,7 @@ async function main() {
     { key: 'documents:generate', module: 'employees', resource: 'document', action: 'generate', description: 'Dokumente aus Vorlagen generieren' },
     { key: 'settings:read', module: 'settings', resource: 'tenantSetting', action: 'read', description: 'Einstellungen anzeigen' },
     { key: 'settings:update', module: 'settings', resource: 'tenantSetting', action: 'update', description: 'Einstellungen bearbeiten' },
+    { key: 'tenant:manage', module: 'admin', resource: 'tenant', action: 'manage', description: 'Firmen-Einstellungen verwalten' },
     { key: 'modules:manage', module: 'modules', resource: 'module', action: 'manage', description: 'Module verwalten' },
   ];
 
