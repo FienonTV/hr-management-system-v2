@@ -255,7 +255,7 @@ export async function generateDocumentFromTemplate(
   const checksum = createHash("sha256").update(pdfBuffer).digest("hex");
 
   const created = await withTenant(tenantId, async (tx) => {
-    return tx.file.create({
+    const file = await tx.file.create({
       data: {
         id: fileId,
         tenantId,
@@ -279,6 +279,22 @@ export async function generateDocumentFromTemplate(
           create: (options.categoryIds ?? []).map((categoryId) => ({ categoryId })),
         },
       },
+    });
+
+    const container = await tx.documentContainer.create({
+      data: {
+        tenantId,
+        employeeId,
+        title: file.title,
+        notes: file.notes,
+        expiresAt: file.expiresAt,
+        category: file.category,
+      },
+    });
+
+    return tx.file.update({
+      where: { id: file.id },
+      data: { containerId: container.id },
     });
   });
 
@@ -423,7 +439,7 @@ export async function generateDocumentGroup(
   const checksum = createHash("sha256").update(pdfBuffer).digest("hex");
 
   const created = await withTenant(tenantId, async (tx) => {
-    return tx.file.create({
+    const file = await tx.file.create({
       data: {
         id: fileId,
         tenantId,
@@ -447,6 +463,22 @@ export async function generateDocumentGroup(
           create: (options.categoryIds ?? []).map((categoryId) => ({ categoryId })),
         },
       },
+    });
+
+    const container = await tx.documentContainer.create({
+      data: {
+        tenantId,
+        employeeId,
+        title: file.title,
+        notes: file.notes,
+        expiresAt: file.expiresAt,
+        category: file.category,
+      },
+    });
+
+    return tx.file.update({
+      where: { id: file.id },
+      data: { containerId: container.id },
     });
   });
 
