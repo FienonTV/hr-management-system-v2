@@ -2,7 +2,7 @@
 import { auth } from "@/lib/auth";
 import { Employee } from "@prisma/client";
 import Link from "next/link";
-import { Plus, Edit, User, Search } from "lucide-react";
+import { Plus, Edit, User, Search, Eye } from "lucide-react";
 import { redirect } from "next/navigation";
 
 function initials(emp: Employee) {
@@ -72,14 +72,20 @@ export default async function EmployeesPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200 bg-white">
                   {employees.map((employee) => (
-                    <tr key={employee.id} className="hover:bg-gray-50">
+                    <tr key={employee.id} className="hover:bg-gray-50 group relative">
                       <td className="whitespace-nowrap px-6 py-4">
-                        <div className="flex items-center">
+                        <Link
+                          href={`/dashboard/modules/employees/${employee.id}`}
+                          className="absolute inset-0 z-0"
+                          aria-hidden="true"
+                          tabIndex={-1}
+                        />
+                        <div className="relative z-10 flex items-center">
                           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-100">
                             <span className="text-sm font-medium text-primary-600">{initials(employee)}</span>
                           </div>
                           <div className="ml-4">
-                            <div className="text-sm font-medium text-gray-900">
+                            <div className="text-sm font-medium text-gray-900 group-hover:text-primary-600 transition-colors">
                               {employee.firstName} {employee.lastName}
                             </div>
                             <div className="text-xs text-gray-500">
@@ -88,10 +94,10 @@ export default async function EmployeesPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">{employee.email || '-'}</td>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">{employee.position || '-'}</td>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">{employee.department || '-'}</td>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+                      <td className="relative z-10 whitespace-nowrap px-6 py-4 text-sm text-gray-900">{employee.email || '-'}</td>
+                      <td className="relative z-10 whitespace-nowrap px-6 py-4 text-sm text-gray-900">{employee.position || '-'}</td>
+                      <td className="relative z-10 whitespace-nowrap px-6 py-4 text-sm text-gray-900">{employee.department || '-'}</td>
+                      <td className="relative z-10 whitespace-nowrap px-6 py-4 text-sm text-gray-900">
                         <span
                           className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
                             employee.status === "ACTIVE"
@@ -114,12 +120,12 @@ export default async function EmployeesPage() {
                                   : employee.status}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+                      <td className="relative z-10 whitespace-nowrap px-6 py-4 text-sm text-gray-900">
                         {employee.startDate
                           ? new Date(employee.startDate).toLocaleDateString("de-DE")
                           : '-'}
                       </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+                      <td className="relative z-10 whitespace-nowrap px-6 py-4 text-sm text-gray-900">
                         {('userAccount' in employee && employee.userAccount) ? (
                           <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
                             Aktiv
@@ -130,10 +136,17 @@ export default async function EmployeesPage() {
                           </span>
                         )}
                       </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
+                      <td className="relative z-20 whitespace-nowrap px-6 py-4 text-right text-sm">
                         <div className="flex items-center justify-end space-x-2">
                           <Link
                             href={`/dashboard/modules/employees/${employee.id}`}
+                            className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-primary-600"
+                            title="Ansehen"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Link>
+                          <Link
+                            href={`/dashboard/modules/employees/${employee.id}/edit`}
                             className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-primary-600"
                             title="Bearbeiten"
                           >
