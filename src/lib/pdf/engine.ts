@@ -114,21 +114,42 @@ async function applyLetterhead(pdfBuffer: Buffer, letterheadPath: string): Promi
   const letterheadBytes = await getStorageAdapter().download(letterheadPath).catch(() => null);
   if (!letterheadBytes) return pdfBuffer;
 
-  const letterheadImage = letterheadPath.toLowerCase().endsWith(".png")
-    ? await basePdf.embedPng(letterheadBytes)
-    : await basePdf.embedJpg(letterheadBytes);
+  const lowerPath = letterheadPath.toLowerCase();
 
-  const { width, height } = letterheadImage.size();
+  if (lowerPath.endsWith(".pdf")) {
+    const letterheadPdf = await PDFDocument.load(Buffer.from(letterheadBytes));
+    const copiedPages = await basePdf.copyPages(letterheadPdf, letterheadPdf.getPageIndices());
+    for (let i = 0; i < basePdf.getPageCount(); i++) {
+      const targetPage = basePdf.getPage(i);
+      const letterheadPage = copiedPages[i] ?? copiedPages[0];
+      if (!letterheadPage) continue;
+      // Embed the letterhead page as a form XObject and draw it full-page behind content.
+      const embedded = await basePdf.embedPage(letterheadPage);
+      const pageSize = targetPage.getSize();
+      targetPage.drawPage(embedded, {
+        x: 0,
+        y: 0,
+        width: pageSize.width,
+        height: pageSize.height,
+      });
+    }
+  } else {
+    const letterheadImage = lowerPath.endsWith(".png")
+      ? await basePdf.embedPng(letterheadBytes)
+      : await basePdf.embedJpg(letterheadBytes);
 
-  for (const page of basePdf.getPages()) {
-    const pageSize = page.getSize();
-    page.drawImage(letterheadImage, {
-      x: 0,
-      y: 0,
-      width: pageSize.width,
-      height: (width / pageSize.width) * height,
-      opacity: 1,
-    });
+    const { width, height } = letterheadImage.size();
+
+    for (const page of basePdf.getPages()) {
+      const pageSize = page.getSize();
+      page.drawImage(letterheadImage, {
+        x: 0,
+        y: 0,
+        width: pageSize.width,
+        height: pageSize.width * (height / width),
+        opacity: 1,
+      });
+    }
   }
 
   return Buffer.from(await basePdf.save());

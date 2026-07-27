@@ -210,7 +210,7 @@ export async function generateDocumentFromTemplate(
   );
 
   const substitutedBody = substituteVariables(template.content, context);
-  const headerHtml = letterhead.companyName
+  const headerHtml = letterhead.mode === "build" && letterhead.companyName
     ? [
         letterhead.companyName,
         letterhead.addressLine1,
@@ -219,14 +219,19 @@ export async function generateDocumentFromTemplate(
         .filter(Boolean)
         .join("<br/>")
     : undefined;
-  const footerHtml = letterhead.footerText || undefined;
-
-  const logoFile = letterhead.logoFileId
-    ? await prismaAdmin.file.findFirst({
-        where: { id: letterhead.logoFileId, tenantId },
-        select: { storageKey: true },
-      })
-    : null;
+  const footerHtml = letterhead.mode === "build" ? letterhead.footerText || undefined : undefined;
+  const letterheadPath =
+    letterhead.mode === "upload" && letterhead.backgroundFileId
+      ? (await prismaAdmin.file.findFirst({
+          where: { id: letterhead.backgroundFileId, tenantId },
+          select: { storageKey: true },
+        }))?.storageKey ?? undefined
+      : letterhead.mode === "build" && letterhead.logoFileId
+        ? (await prismaAdmin.file.findFirst({
+            where: { id: letterhead.logoFileId, tenantId },
+            select: { storageKey: true },
+          }))?.storageKey ?? undefined
+        : undefined;
 
   const pdfBuffer = await renderHtmlToPdf(substitutedBody, {
     format: "A4",
@@ -237,7 +242,7 @@ export async function generateDocumentFromTemplate(
     marginRight: letterhead.marginRight,
     headerHtml,
     footerHtml,
-    letterheadPath: logoFile?.storageKey ?? undefined,
+    letterheadPath,
   });
 
   const fileId = randomUUID();

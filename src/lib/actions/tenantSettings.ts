@@ -90,6 +90,8 @@ export async function deleteTenantSetting(
 export type TenantSettingItem = Awaited<ReturnType<typeof getTenantSettings>>[number];
 
 export interface LetterheadSettings {
+  mode: "upload" | "build";
+  backgroundFileId: string | null;
   logoFileId: string | null;
   companyName: string;
   addressLine1: string;
@@ -102,6 +104,8 @@ export interface LetterheadSettings {
 }
 
 const LETTERHEAD_KEYS = [
+  "letterhead.mode",
+  "letterhead.backgroundFileId",
   "letterhead.logoFileId",
   "letterhead.companyName",
   "letterhead.addressLine1",
@@ -129,7 +133,10 @@ export async function getLetterheadSettings(): Promise<LetterheadSettings> {
   });
 
   const map = new Map<string, string | null>(settings.map((s) => [s.key, s.value]));
+  const mode = map.get("letterhead.mode") || "build";
   return {
+    mode: mode === "upload" || mode === "build" ? mode : "build",
+    backgroundFileId: (map.get("letterhead.backgroundFileId") as string | null | undefined) || null,
     logoFileId: (map.get("letterhead.logoFileId") as string | null | undefined) || null,
     companyName: (map.get("letterhead.companyName") as string | undefined) || "",
     addressLine1: (map.get("letterhead.addressLine1") as string | undefined) || "",
