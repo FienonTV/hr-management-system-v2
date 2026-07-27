@@ -26,6 +26,7 @@ model Tenant {
   settings            TenantSetting[]
   modules             TenantModule[]
   files               File[]
+  documentContainers  DocumentContainer[]
   auditLogs           AuditLog[]
   roles               Role[]
   employees           Employee[]
@@ -225,8 +226,9 @@ model File {
   parentType        String?      @map("parent_type") // e.g. "employee", "tenant", "contract", "documentTemplate"
   parentId          String?      @map("parent_id")
   version           Int          @default(1)
-  versionOfId       String?      @map("version_of_id") // points to the first/original file id
+  versionOfId       String?      @map("version_of_id") // legacy self-referential version chain; prefer containerId
   isLatestVersion   Boolean      @default(true) @map("is_latest_version")
+  containerId       String?      @map("container_id")
   isDeleted         Boolean      @default(false)
   deletedAt         DateTime?    @map("deleted_at")
   deletedById       String?      @map("deleted_by_id")
@@ -236,6 +238,7 @@ model File {
   tenant            Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   uploadedBy        User?                 @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
   employee          Employee?               @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  container         DocumentContainer?    @relation("ContainerFiles", fields: [containerId], references: [id], onDelete: SetNull)
   versions          File[]                  @relation("FileVersions")
   versionOf         File?                   @relation("FileVersions", fields: [versionOfId], references: [id], onDelete: SetNull)
   documentCategories FileDocumentCategory[]
@@ -244,11 +247,38 @@ model File {
   @@index([tenantId, storageKey])
   @@index([tenantId, uploadedById])
   @@index([tenantId, employeeId])
+  @@index([tenantId, containerId])
   @@index([tenantId, parentType, parentId])
   @@index([tenantId, category])
   @@index([tenantId, isDeleted])
   @@index([versionOfId])
   @@map("files")
+}
+
+model DocumentContainer {
+  id           String   @id @default(cuid())
+  tenantId     String   @map("tenant_id")
+  employeeId   String?  @map("employee_id")
+  title        String
+  notes        String?
+  expiresAt    DateTime?
+  snoozedUntil DateTime? @map("snoozed_until")
+  category     FileCategory @default(OTHER)
+  isDeleted    Boolean  @default(false)
+  deletedAt    DateTime? @map("deleted_at")
+  deletedById  String?  @map("deleted_by_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee   Employee?  @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  files      File[]     @relation("ContainerFiles")
+
+  @@index([tenantId])
+  @@index([tenantId, employeeId])
+  @@index([tenantId, isDeleted])
+  @@index([tenantId, category])
+  @@map("document_containers")
 }
 
 model FileDocumentCategory {
@@ -411,6 +441,7 @@ model Employee {
   tenant      Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   userAccount User?
   files       File[]
+  documentContainers DocumentContainer[]
 
   @@unique([tenantId, employeeNumber])
   @@index([tenantId])

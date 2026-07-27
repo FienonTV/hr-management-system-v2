@@ -4,6 +4,7 @@ import { withTenant } from "@/lib/db/tenant";
 import { requirePermission } from "@/lib/permissions";
 import { revalidatePath } from 'next/cache';
 import type { Employee, User } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import {
   createEmployeeSchema,
   updateEmployeeSchema,
@@ -66,11 +67,23 @@ function normalizeEmployeeInput(data: EmployeeBaseInput | Partial<EmployeeBaseIn
   return normalized;
 }
 
-export async function getEmployees(): Promise<(Employee & { userAccount?: User | null })[]> {
+export async function getEmployees(search?: string): Promise<(Employee & { userAccount?: User | null })[]> {
   const { tenantId } = await requirePermission("employees:read");
   return withTenant(tenantId, async (tx) => {
+    const normalizedSearch = search?.trim();
+    const where: Prisma.EmployeeWhereInput = { tenantId };
+    if (normalizedSearch) {
+      where.OR = [
+        { firstName: { contains: normalizedSearch, mode: "insensitive" } },
+        { lastName: { contains: normalizedSearch, mode: "insensitive" } },
+        { email: { contains: normalizedSearch, mode: "insensitive" } },
+        { employeeNumber: { contains: normalizedSearch, mode: "insensitive" } },
+        { position: { contains: normalizedSearch, mode: "insensitive" } },
+        { department: { contains: normalizedSearch, mode: "insensitive" } },
+      ];
+    }
     return await tx.employee.findMany({
-      where: { tenantId },
+      where,
       orderBy: { lastName: 'asc' },
       include: { userAccount: true },
     });

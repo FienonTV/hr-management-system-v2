@@ -5,7 +5,7 @@ import { requirePermission } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import type { File as FileRecord, FileCategory, Prisma } from "@prisma/client";
+import type { File as FileRecord, FileCategory, Prisma, DocumentContainer } from "@prisma/client";
 
 const CreateDocumentSchema = z.object({
   employeeId: z.string().min(1),
@@ -14,9 +14,21 @@ const CreateDocumentSchema = z.object({
   category: z.string().min(1),
   expiresAt: z.string().datetime().optional(),
   notes: z.string().optional(),
+  categoryIds: z.array(z.string()).optional(),
+});
+
+const UploadVersionSchema = z.object({
+  containerId: z.string().min(1),
+  fileId: z.string().min(1),
+  title: z.string().min(1),
+  category: z.string().min(1),
+  expiresAt: z.string().datetime().optional(),
+  notes: z.string().optional(),
+  categoryIds: z.array(z.string()).optional(),
 });
 
 export type CreateDocumentInput = z.infer<typeof CreateDocumentSchema>;
+export type UploadVersionInput = z.infer<typeof UploadVersionSchema>;
 
 function mapDocumentTypeToCategory(type: string): FileCategory {
   const map: Record<string, FileCategory> = {
@@ -35,157 +47,348 @@ export async function createEmployeeDocument(data: unknown) {
   const category = mapDocumentTypeToCategory(validated.category);
 
   return withTenant(tenantId, async (tx) => {
-    const file = await tx.file.findUnique({
-      where: { id: validated.fileId },
-    });
-
+    const file = await tx.file.findUnique({ where: { id: validated.fileId } });
     if (!file || file.tenantId !== tenantId) {
       return { success: false, error: "Datei nicht gefunden" };
     }
 
-    const employee = await tx.employee.findUnique({
-      where: { id: validated.employeeId },
-    });
-
+    const employee = await tx.employee.findUnique({ where: { id: validated.employeeId } });
     if (!employee || employee.tenantId !== tenantId) {
       return { success: false, error: "Mitarbeiter nicht gefunden" };
     }
 
-    // Mark any existing latest version of this logical document as not latest.
-    // We identify the version chain by versionOfId. If this file is brand new,
-    // it becomes the root of the chain.
-    const versionOfId = file.versionOfId ?? file.id;
-    await tx.file.updateMany({
-      where: {
+    const container = await tx.documentContainer.create({
+      data: {
         tenantId,
         employeeId: validated.employeeId,
-        versionOfId,
-        isLatestVersion: true,
+        title: validated.title,
+        notes: validated.notes ?? null,
+        expiresAt: validated.expiresAt ? new Date(validated.expiresAt) : null,
+        category,
       },
-      data: { isLatestVersion: false },
     });
-
-    const latestVersion = await tx.file.findFirst({
-      where: { tenantId, employeeId: validated.employeeId, versionOfId },
-      orderBy: { version: "desc" },
-      select: { version: true },
-    });
-
-    const nextVersion = (latestVersion?.version ?? 0) + 1;
 
     const updated = await tx.file.update({
       where: { id: validated.fileId },
       data: {
         employeeId: validated.employeeId,
+        containerId: container.id,
         title: validated.title,
         category,
         expiresAt: validated.expiresAt ? new Date(validated.expiresAt) : null,
         notes: validated.notes ?? null,
-        versionOfId,
+        version: 1,
+        isLatestVersion: true,
+      },
+    });
+
+    if (validated.categoryIds?.length) {
+      await tx.fileDocumentCategory.createMany({
+        data: validated.categoryIds.map((categoryId) => ({
+          fileId: updated.id,
+          categoryId,
+        })),
+      });
+    }
+
+    await logAudit({
+      tenantId,
+      userId: session.user.id,
+      action: "document.container.create",
+      resourceType: "DocumentContainer",
+      resourceId: container.id,
+      metadata: { employeeId: validated.employeeId, fileId: updated.id, version: 1 },
+    });
+
+    revalidatePath(`/dashboard/modules/employees/${validated.employeeId}`);
+    return { success: true, document: updated, container };
+  });
+}
+
+export async function uploadDocumentVersion(data: unknown) {
+  const { tenantId, session } = await requirePermission("documents:create");
+  const validated = UploadVersionSchema.parse(data);
+  const category = mapDocumentTypeToCategory(validated.category);
+
+  return withTenant(tenantId, async (tx) => {
+    const file = await tx.file.findUnique({ where: { id: validated.fileId } });
+    if (!file || file.tenantId !== tenantId) {
+      return { success: false, error: "Datei nicht gefunden" };
+    }
+
+    const container = await tx.documentContainer.findUnique({
+      where: { id: validated.containerId },
+      include: { files: { where: { isDeleted: false }, orderBy: { version: "desc" }, take: 1 } },
+    });
+    if (!container || container.tenantId !== tenantId) {
+      return { success: false, error: "Dokument nicht gefunden" };
+    }
+
+    const nextVersion = (container.files[0]?.version ?? 0) + 1;
+
+    // Mark previous versions as not latest
+    await tx.file.updateMany({
+      where: { containerId: container.id },
+      data: { isLatestVersion: false },
+    });
+
+    const updated = await tx.file.update({
+      where: { id: validated.fileId },
+      data: {
+        employeeId: container.employeeId,
+        containerId: container.id,
+        title: validated.title,
+        category,
+        expiresAt: validated.expiresAt ? new Date(validated.expiresAt) : null,
+        notes: validated.notes ?? null,
         version: nextVersion,
         isLatestVersion: true,
       },
     });
 
+    if (validated.categoryIds?.length) {
+      await tx.fileDocumentCategory.createMany({
+        data: validated.categoryIds.map((categoryId) => ({
+          fileId: updated.id,
+          categoryId,
+        })),
+      });
+    }
+
+    // Container übernimmt Metadaten der neuesten Version
+    await tx.documentContainer.update({
+      where: { id: container.id },
+      data: {
+        title: validated.title,
+        category,
+        expiresAt: validated.expiresAt ? new Date(validated.expiresAt) : null,
+        notes: validated.notes ?? null,
+      },
+    });
+
     await logAudit({
       tenantId,
       userId: session.user.id,
-      action: "CREATE_EMPLOYEE_DOCUMENT",
-      resourceType: "File",
-      resourceId: updated.id,
-      metadata: { employeeId: validated.employeeId, version: nextVersion },
+      action: "document.container.version.add",
+      resourceType: "DocumentContainer",
+      resourceId: container.id,
+      metadata: { fileId: updated.id, version: nextVersion },
     });
 
-    revalidatePath(`/dashboard/modules/employees/${validated.employeeId}`);
-    return { success: true, document: updated };
+    if (container.employeeId) {
+      revalidatePath(`/dashboard/modules/employees/${container.employeeId}`);
+    }
+    revalidatePath(`/dashboard/modules/documents`);
+    return { success: true, document: updated, container };
   });
 }
 
+export type DocumentContainerWithLatest = DocumentContainer & {
+  latestFile: FileRecord | null;
+  versionCount: number;
+  categories: { id: string; name: string; color: string | null }[];
+  employee?: { firstName: string | null; lastName: string | null; employeeNumber: string | null } | null;
+};
+
 export async function getEmployeeDocuments(employeeId: string): Promise<
-  { success: true; documents: FileRecord[] } | { success: false; error: string }
+  { success: true; documents: DocumentContainerWithLatest[] } | { success: false; error: string }
 > {
   const { tenantId } = await requirePermission("documents:read");
 
   return withTenant(tenantId, async (tx) => {
-    const employee = await tx.employee.findUnique({
-      where: { id: employeeId },
-    });
-
+    const employee = await tx.employee.findUnique({ where: { id: employeeId } });
     if (!employee || employee.tenantId !== tenantId) {
       return { success: false, error: "Mitarbeiter nicht gefunden" };
     }
 
-    const documents = await tx.file.findMany({
+    const containers = await tx.documentContainer.findMany({
       where: {
         tenantId,
         employeeId,
         isDeleted: false,
-        isLatestVersion: true,
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: { updatedAt: "desc" },
+      include: {
+        files: {
+          where: { isDeleted: false },
+          orderBy: { version: "desc" },
+          take: 1,
+          include: {
+            documentCategories: { include: { category: true } },
+          },
+        },
+      },
     });
 
-    return { success: true, documents };
+    const result: DocumentContainerWithLatest[] = containers.map((c) => {
+      const latestFile = c.files[0] ?? null;
+      return {
+        ...c,
+        latestFile,
+        versionCount: c.files.length, // because we only took 1, this is wrong; fix below
+        categories: latestFile?.documentCategories.map((dc) => ({
+          id: dc.category.id,
+          name: dc.category.name,
+          color: dc.category.color,
+        })) ?? [],
+      };
+    });
+
+    // fix version count with a separate query
+    const counts = await tx.file.groupBy({
+      by: ["containerId"],
+      where: { tenantId, employeeId, isDeleted: false, containerId: { not: null } },
+      _count: { id: true },
+    });
+    const countMap = new Map<string, number>(counts.map((c) => [c.containerId!, Number((c._count as { id: number }).id)]));
+    for (const r of result) {
+      r.versionCount = countMap.get(r.id) ?? 1;
+    }
+
+    return { success: true, documents: result };
   });
 }
 
-export async function deleteEmployeeDocument(fileId: string, employeeId: string) {
+export async function deleteEmployeeDocument(containerId: string, employeeId?: string) {
   const { tenantId, session } = await requirePermission("documents:delete");
 
   return withTenant(tenantId, async (tx) => {
-    const file = await tx.file.findUnique({
-      where: { id: fileId },
-    });
-
-    if (!file || file.tenantId !== tenantId || file.employeeId !== employeeId) {
+    const container = await tx.documentContainer.findUnique({ where: { id: containerId } });
+    if (!container || container.tenantId !== tenantId) {
       return { success: false, error: "Dokument nicht gefunden" };
     }
 
-    await tx.file.update({
-      where: { id: fileId },
-      data: {
-        isDeleted: true,
-        deletedAt: new Date(),
-        deletedById: session.user.id,
-      },
+    await tx.documentContainer.update({
+      where: { id: containerId },
+      data: { isDeleted: true, deletedAt: new Date(), deletedById: session.user.id },
+    });
+
+    await tx.file.updateMany({
+      where: { containerId },
+      data: { isDeleted: true, deletedAt: new Date(), deletedById: session.user.id },
     });
 
     await logAudit({
       tenantId,
       userId: session.user.id,
-      action: "DELETE_EMPLOYEE_DOCUMENT",
-      resourceType: "File",
-      resourceId: fileId,
-      metadata: { employeeId },
+      action: "document.container.delete",
+      resourceType: "DocumentContainer",
+      resourceId: containerId,
+      metadata: { employeeId: container.employeeId },
     });
 
-    revalidatePath(`/dashboard/modules/employees/${employeeId}`);
+    if (employeeId) {
+      revalidatePath(`/dashboard/modules/employees/${employeeId}`);
+    }
+    revalidatePath(`/dashboard/modules/documents`);
     return { success: true };
   });
 }
 
-export async function getDocumentVersions(fileId: string): Promise<
+export async function getDocumentVersions(containerId: string): Promise<
   { success: true; versions: FileRecord[] } | { success: false; error: string }
 > {
   const { tenantId } = await requirePermission("documents:read");
 
   return withTenant(tenantId, async (tx) => {
-    const file = await tx.file.findUnique({ where: { id: fileId } });
-    if (!file || file.tenantId !== tenantId) {
+    const container = await tx.documentContainer.findUnique({ where: { id: containerId } });
+    if (!container || container.tenantId !== tenantId) {
       return { success: false, error: "Dokument nicht gefunden" };
     }
 
-    const versionOfId = file.versionOfId ?? file.id;
     const versions = await tx.file.findMany({
-      where: {
-        tenantId,
-        versionOfId,
-        isDeleted: false,
-      },
+      where: { tenantId, containerId, isDeleted: false },
       orderBy: { version: "desc" },
     });
 
     return { success: true, versions };
+  });
+}
+
+export async function snoozeDocument(containerId: string, untilIso: string) {
+  const { tenantId, session } = await requirePermission("documents:update");
+
+  return withTenant(tenantId, async (tx) => {
+    const container = await tx.documentContainer.findUnique({ where: { id: containerId } });
+    if (!container || container.tenantId !== tenantId) {
+      return { success: false, error: "Dokument nicht gefunden" };
+    }
+
+    await tx.documentContainer.update({
+      where: { id: containerId },
+      data: { snoozedUntil: new Date(untilIso) },
+    });
+
+    await logAudit({
+      tenantId,
+      userId: session.user.id,
+      action: "document.container.snooze",
+      resourceType: "DocumentContainer",
+      resourceId: containerId,
+      metadata: { until: untilIso },
+    });
+
+    revalidatePath(`/dashboard/modules/documents`);
+    if (container.employeeId) {
+      revalidatePath(`/dashboard/modules/employees/${container.employeeId}`);
+    }
+    return { success: true };
+  });
+}
+
+export async function getExpiringDocuments(limit = 5) {
+  const { tenantId } = await requirePermission("documents:read");
+
+  return withTenant(tenantId, async (tx) => {
+    const now = new Date();
+    const sevenDays = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    const containers = await tx.documentContainer.findMany({
+      where: {
+        tenantId,
+        isDeleted: false,
+        expiresAt: { lte: sevenDays, gte: now },
+        OR: [{ snoozedUntil: null }, { snoozedUntil: { lt: now } }],
+      },
+      orderBy: { expiresAt: "asc" },
+      take: limit,
+      include: {
+        employee: { select: { firstName: true, lastName: true, employeeNumber: true } },
+        files: {
+          where: { isDeleted: false },
+          orderBy: { version: "desc" },
+          take: 1,
+          include: {
+            documentCategories: { include: { category: true } },
+          },
+        },
+      },
+    });
+
+    const result = containers.map((c) => {
+      const latestFile = c.files[0] ?? null;
+      return {
+        ...c,
+        latestFile,
+        versionCount: 1,
+        categories: latestFile?.documentCategories.map((dc) => ({
+          id: dc.category.id,
+          name: dc.category.name,
+          color: dc.category.color,
+        })) ?? [],
+      };
+    });
+    const counts = await tx.file.groupBy({
+      by: ["containerId"],
+      where: { tenantId, isDeleted: false, containerId: { in: result.map((r) => r.id) } },
+      _count: { id: true },
+    });
+    const countMap = new Map(counts.map((c) => [c.containerId!, (c._count as { id: number }).id]));
+    for (const r of result) {
+      r.versionCount = countMap.get(r.id) ?? 1;
+    }
+
+    return { success: true, documents: result as DocumentContainerWithLatest[] };
   });
 }
 
@@ -196,96 +399,77 @@ export async function getAllDocuments(params?: { status?: "all" | "expired" | "e
     const now = new Date();
     const sevenDays = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-    const where: Prisma.FileWhereInput = {
+    const where: Prisma.DocumentContainerWhereInput = {
       tenantId,
       isDeleted: false,
-      isLatestVersion: true,
-      employeeId: { not: null },
     };
 
-    if (params?.status === "expired") {
+    const status = params?.status ?? "all";
+    if (status === "expired") {
       where.expiresAt = { lt: now };
-    } else if (params?.status === "expiring") {
+    } else if (status === "expiring") {
       where.expiresAt = { gte: now, lte: sevenDays };
-    } else if (params?.status === "valid") {
-      where.OR = [{ expiresAt: null }, { expiresAt: { gt: sevenDays } }];
-    }
-
-    if (params?.search) {
-      const term = params.search.trim().toLowerCase();
+    } else if (status === "valid") {
       where.OR = [
-        { title: { contains: term, mode: "insensitive" } },
-        { originalName: { contains: term, mode: "insensitive" } },
-        { notes: { contains: term, mode: "insensitive" } },
-        { employee: { firstName: { contains: term, mode: "insensitive" } } },
-        { employee: { lastName: { contains: term, mode: "insensitive" } } },
+        { expiresAt: null },
+        { expiresAt: { gt: sevenDays } },
       ];
     }
 
-    const documents = await tx.file.findMany({
-      where,
-      include: {
-        employee: { select: { firstName: true, lastName: true, employeeNumber: true } },
-        uploadedBy: { select: { firstName: true, lastName: true, email: true } },
-      },
-      orderBy: { createdAt: "desc" },
-      take: params?.limit ?? 100,
-    });
-
-    return { success: true, documents };
-  });
-}
-
-export async function snoozeDocument(fileId: string, snoozedUntil: string) {
-  const { tenantId, session } = await requirePermission("documents:update");
-
-  return withTenant(tenantId, async (tx) => {
-    const file = await tx.file.findUnique({ where: { id: fileId } });
-    if (!file || file.tenantId !== tenantId) {
-      return { success: false, error: "Dokument nicht gefunden" };
+    const search = params?.search?.trim();
+    if (search) {
+      where.OR = [
+        { title: { contains: search, mode: "insensitive" } },
+        { notes: { contains: search, mode: "insensitive" } },
+        { employee: { firstName: { contains: search, mode: "insensitive" } } },
+        { employee: { lastName: { contains: search, mode: "insensitive" } } },
+      ];
     }
 
-    await tx.file.update({
-      where: { id: fileId },
-      data: { snoozedUntil: new Date(snoozedUntil) },
-    });
-
-    await logAudit({
-      tenantId,
-      userId: session.user.id,
-      action: "SNOOZE_DOCUMENT",
-      resourceType: "File",
-      resourceId: fileId,
-      metadata: { snoozedUntil },
-    });
-
-    return { success: true };
-  });
-}
-
-export async function getExpiringDocuments(limit = 10) {
-  const { tenantId } = await requirePermission("documents:read");
-
-  return withTenant(tenantId, async (tx) => {
-    const now = new Date();
-    const sevenDays = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-
-    const documents = await tx.file.findMany({
-      where: {
-        tenantId,
-        isDeleted: false,
-        isLatestVersion: true,
-        employeeId: { not: null },
-        expiresAt: { not: null, gte: now, lte: sevenDays },
-        OR: [{ snoozedUntil: null }, { snoozedUntil: { lt: now } }],
-      },
+    const containers = await tx.documentContainer.findMany({
+      where,
+      orderBy: { updatedAt: "desc" },
+      take: params?.limit ?? 200,
       include: {
         employee: { select: { firstName: true, lastName: true, employeeNumber: true } },
+        files: {
+          where: { isDeleted: false },
+          orderBy: { version: "desc" },
+          take: 1,
+          include: {
+            documentCategories: { include: { category: true } },
+          },
+        },
       },
-      orderBy: { expiresAt: "asc" },
-      take: limit,
     });
 
-    return { success: true, documents };
+    const result: DocumentContainerWithLatest[] = containers.map((c) => {
+      const latestFile = c.files[0] ?? null;
+      return {
+        ...c,
+        latestFile,
+        versionCount: c.files.length,
+        categories: latestFile?.documentCategories.map((dc) => ({
+          id: dc.category.id,
+          name: dc.category.name,
+          color: dc.category.color,
+        })) ?? [],
+      };
+    });
+
+    // Fix version counts
+    if (result.length > 0) {
+      const counts = await tx.file.groupBy({
+        by: ["containerId"],
+        where: { tenantId, isDeleted: false, containerId: { in: result.map((r) => r.id) } },
+        _count: { id: true },
+      });
+      const countMap = new Map<string, number>(counts.map((c) => [c.containerId!, Number((c._count as { id: number }).id)]));
+      for (const r of result) {
+        r.versionCount = countMap.get(r.id) ?? 1;
+      }
+    }
+
+    return { success: true, documents: result };
   });
 }
