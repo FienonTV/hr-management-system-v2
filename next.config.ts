@@ -21,8 +21,13 @@ const cspDirectives = [
   .join("; ");
 
 const nextConfig: NextConfig = {
+  experimental: {
+    serverActions: {
+      bodySizeLimit: 10 * 1024 * 1024,
+    },
+  },
   serverActions: {
-    bodySizeLimit: "10mb",
+    bodySizeLimit: 10 * 1024 * 1024,
   },
   serverExternalPackages: ["pg", "@prisma/adapter-pg", "bcryptjs"],
   eslint: {
