@@ -23,6 +23,7 @@ interface TemplateEditorDialogProps {
   onClose: () => void;
   template?: TemplateFormData;
   categories: Category[];
+  canManage: boolean;
   onSubmit: (data: TemplateFormData) => void;
   onDelete?: () => void;
 }
@@ -32,6 +33,7 @@ export function TemplateEditorDialog({
   onClose,
   template,
   categories,
+  canManage,
   onSubmit,
   onDelete,
 }: TemplateEditorDialogProps) {
@@ -86,8 +88,9 @@ export function TemplateEditorDialog({
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                disabled={!canManage}
                 placeholder="z.B. Arbeitsvertrag"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:opacity-50"
               />
             </div>
             <div>
@@ -95,7 +98,8 @@ export function TemplateEditorDialog({
               <select
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                disabled={!canManage}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:opacity-50"
               >
                 <option value="">Keine Kategorie</option>
                 {categories.filter((c) => c.isActive).map((c) => (
@@ -109,7 +113,8 @@ export function TemplateEditorDialog({
                 type="checkbox"
                 checked={isActive}
                 onChange={(e) => setIsActive(e.target.checked)}
-                className="rounded"
+                disabled={!canManage}
+                className="rounded disabled:opacity-50"
               />
               <label htmlFor="tmpl-active" className="text-sm text-gray-700">Aktiv</label>
             </div>
@@ -121,17 +126,18 @@ export function TemplateEditorDialog({
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              disabled={!canManage}
               placeholder="Kurze Beschreibung (optional)"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:opacity-50"
             />
           </div>
 
-          <TemplateEditor initialContent={content} onChange={setContent} />
+          <TemplateEditor initialContent={content} onChange={setContent} readOnly={!canManage} />
         </div>
 
         <div className="flex justify-between border-t border-gray-200 px-6 py-4">
           <div>
-            {onDelete && template && (
+            {onDelete && template && canManage && (
               <button
                 type="button"
                 onClick={onDelete}
@@ -149,14 +155,24 @@ export function TemplateEditorDialog({
             >
               Abbrechen
             </button>
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={!name.trim() || !content || content === "<p></p>"}
-              className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
-            >
-              {template ? "Speichern" : "Vorlage erstellen"}
-            </button>
+            {canManage ? (
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={!name.trim() || !content || content === "<p></p>"}
+                className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+              >
+                {template ? "Speichern" : "Vorlage erstellen"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled
+                className="rounded-lg bg-gray-300 px-4 py-2 text-sm font-medium text-white cursor-not-allowed"
+              >
+                Keine Berechtigung
+              </button>
+            )}
           </div>
         </div>
       </div>

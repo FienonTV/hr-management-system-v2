@@ -24,6 +24,7 @@ interface Template {
 interface Props {
   templates: Template[];
   categories: Category[];
+  canManage: boolean;
   onCreate: (data: {
     name: string;
     description: string;
@@ -44,6 +45,7 @@ interface Props {
 export function DocumentTemplatesClient({
   templates,
   categories,
+  canManage,
   onCreate,
   onUpdate,
   onDelete,
@@ -109,16 +111,18 @@ export function DocumentTemplatesClient({
       <section className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-medium text-gray-900">Vorlagen</h2>
-          <button
-            type="button"
-            onClick={() => {
-              setEditingTemplate(undefined);
-              setIsOpen(true);
-            }}
-            className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
-          >
-            Neue Vorlage
-          </button>
+          {canManage && (
+            <button
+              type="button"
+              onClick={() => {
+                setEditingTemplate(undefined);
+                setIsOpen(true);
+              }}
+              className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
+            >
+              Neue Vorlage
+            </button>
+          )}
         </div>
 
         <table className="mt-4 min-w-full divide-y divide-gray-200">
@@ -129,7 +133,7 @@ export function DocumentTemplatesClient({
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Variablen</th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Kategorie</th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Status</th>
-              <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">Aktion</th>
+              {canManage && <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">Aktion</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 bg-white">
@@ -150,17 +154,19 @@ export function DocumentTemplatesClient({
                     <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700">Inaktiv</span>
                   )}
                 </td>
-                <td className="px-4 py-3 text-right text-sm font-medium">
-                  <button
-                    onClick={() => {
-                      setEditingTemplate(template);
-                      setIsOpen(true);
-                    }}
-                    className="rounded bg-primary-100 px-3 py-1 text-xs text-primary-700 hover:bg-primary-200"
-                  >
-                    Bearbeiten
-                  </button>
-                </td>
+                {canManage && (
+                  <td className="px-4 py-3 text-right text-sm font-medium">
+                    <button
+                      onClick={() => {
+                        setEditingTemplate(template);
+                        setIsOpen(true);
+                      }}
+                      className="rounded bg-primary-100 px-3 py-1 text-xs text-primary-700 hover:bg-primary-200"
+                    >
+                      Bearbeiten
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -186,6 +192,7 @@ export function DocumentTemplatesClient({
             : undefined
         }
         categories={categories}
+        canManage={canManage}
         onSubmit={handleSubmit}
         onDelete={
           editingTemplate

@@ -20,6 +20,8 @@ import {
   getTemplateCustomVariables,
 } from "@/lib/actions/documentTemplates";
 
+import { usePermissions } from "@/lib/hooks/usePermissions";
+
 export type FileItem = PrismaFile;
 
 type Category = PrismaDocumentCategory;
@@ -61,6 +63,7 @@ export default function DocumentsTab({
   const [versionCategoryIds, setVersionCategoryIds] = useState<Set<string>>(new Set());
   const [uploadingVersion, setUploadingVersion] = useState(false);
   const [showGroupModal, setShowGroupModal] = useState(false);
+  const { has: hasPermission } = usePermissions();
 
   useEffect(() => {
     async function load() {
@@ -370,32 +373,40 @@ export default function DocumentsTab({
     });
   }
 
+  const canCreate = hasPermission("documents:create");
+  const canGenerate = hasPermission("documents:generate");
+  const canDelete = hasPermission("documents:delete");
+
   return (
     <div className="space-y-6">
       <form onSubmit={handleUpload} className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-medium text-gray-900">Dokument hochladen</h3>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setShowGroupModal(true)}
-              disabled={templates.length === 0}
-              title={templates.length === 0 ? "Bitte zuerst unter Admin > Dokumentenvorlagen eine Vorlage anlegen" : "Dokumentengruppe aus mehreren Vorlagen erstellen"}
-              className="flex items-center space-x-2 rounded-lg bg-primary-100 px-3 py-2 text-sm font-medium text-primary-700 hover:bg-primary-200 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <FolderPlus className="h-4 w-4" />
-              <span>Dokumentengruppe</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowTemplateModal(true)}
-              disabled={templates.length === 0}
-              title={templates.length === 0 ? "Bitte zuerst unter Admin > Dokumentenvorlagen eine Vorlage anlegen" : "Dokument aus Vorlage generieren"}
-              className="flex items-center space-x-2 rounded-lg bg-primary-100 px-3 py-2 text-sm font-medium text-primary-700 hover:bg-primary-200 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <FileStack className="h-4 w-4" />
-              <span>Aus Vorlage generieren</span>
-            </button>
+            {canGenerate && (
+              <button
+                type="button"
+                onClick={() => setShowGroupModal(true)}
+                disabled={templates.length === 0}
+                title={templates.length === 0 ? "Bitte zuerst unter Admin > Dokumentenvorlagen eine Vorlage anlegen" : "Dokumentengruppe aus mehreren Vorlagen erstellen"}
+                className="flex items-center space-x-2 rounded-lg bg-primary-100 px-3 py-2 text-sm font-medium text-primary-700 hover:bg-primary-200 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <FolderPlus className="h-4 w-4" />
+                <span>Dokumentengruppe</span>
+              </button>
+            )}
+            {canGenerate && (
+              <button
+                type="button"
+                onClick={() => setShowTemplateModal(true)}
+                disabled={templates.length === 0}
+                title={templates.length === 0 ? "Bitte zuerst unter Admin > Dokumentenvorlagen eine Vorlage anlegen" : "Dokument aus Vorlage generieren"}
+                className="flex items-center space-x-2 rounded-lg bg-primary-100 px-3 py-2 text-sm font-medium text-primary-700 hover:bg-primary-200 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <FileStack className="h-4 w-4" />
+                <span>Aus Vorlage generieren</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -409,7 +420,8 @@ export default function DocumentsTab({
               name="file"
               type="file"
               required
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 file:mr-4 file:rounded-md file:border-0 file:bg-primary-50 file:px-3 file:py-1 file:text-sm file:font-medium file:text-primary-700 hover:file:bg-primary-100"
+              disabled={!canCreate}
+              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 file:mr-4 file:rounded-md file:border-0 file:bg-primary-50 file:px-3 file:py-1 file:text-sm file:font-medium file:text-primary-700 hover:file:bg-primary-100 disabled:opacity-50"
             />
             <p className="text-xs text-gray-500">{uploadHint()}</p>
           </div>
@@ -418,7 +430,8 @@ export default function DocumentsTab({
             <select
               id="category"
               name="category"
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              disabled={!canCreate}
+              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
             >
               <option value="OTHER">Sonstiges</option>
               <option value="CONTRACT">Vertrag</option>
@@ -439,10 +452,11 @@ export default function DocumentsTab({
                 <button
                   key={category.id}
                   type="button"
+                  disabled={!canCreate}
                   onClick={() => toggleCategory(category.id)}
                   className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
                     selected ? "text-white" : "bg-white text-gray-700 hover:bg-gray-50"
-                  }`}
+                  } disabled:opacity-50`}
                   style={{
                     backgroundColor: selected ? (category.color || undefined) : undefined,
                     borderColor: category.color || undefined,
@@ -463,8 +477,9 @@ export default function DocumentsTab({
               name="title"
               type="text"
               required
+              disabled={!canCreate}
               placeholder="z. B. Arbeitsvertrag 2026"
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
             />
           </div>
           <div className="space-y-2">
@@ -473,7 +488,8 @@ export default function DocumentsTab({
               id="expiresAt"
               name="expiresAt"
               type="date"
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              disabled={!canCreate}
+              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
             />
           </div>
         </div>
@@ -484,18 +500,21 @@ export default function DocumentsTab({
             id="notes"
             name="notes"
             rows={2}
-            className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            disabled={!canCreate}
+            className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
           />
         </div>
 
-        <button
-          type="submit"
-          disabled={uploading}
-          className="flex items-center space-x-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
-        >
-          <Upload className="h-4 w-4" />
-          <span>{uploading ? "Wird hochgeladen..." : "Hochladen"}</span>
-        </button>
+        {canCreate && (
+          <button
+            type="submit"
+            disabled={uploading}
+            className="flex items-center space-x-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+          >
+            <Upload className="h-4 w-4" />
+            <span>{uploading ? "Wird hochgeladen..." : "Hochladen"}</span>
+          </button>
+        )}
       </form>
 
       <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
@@ -563,14 +582,16 @@ export default function DocumentsTab({
                     >
                       <Download className="h-4 w-4" />
                     </a>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteContainer(container.id)}
-                      className="rounded-lg p-2 text-gray-500 hover:bg-red-50 hover:text-red-600"
-                      title="In Papierkorb verschieben"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    {canDelete && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteContainer(container.id)}
+                        className="rounded-lg p-2 text-gray-500 hover:bg-red-50 hover:text-red-600"
+                        title="In Papierkorb verschieben"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -722,7 +743,7 @@ export default function DocumentsTab({
 
               <button
                 type="submit"
-                disabled={uploadingVersion}
+                disabled={uploadingVersion || !canCreate}
                 className="flex items-center space-x-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
               >
                 <Plus className="h-4 w-4" />
@@ -862,7 +883,7 @@ export default function DocumentsTab({
                 </button>
                 <button
                   type="submit"
-                  disabled={generating || !selectedTemplateId}
+                  disabled={generating || !selectedTemplateId || !canGenerate}
                   className="flex items-center space-x-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
                 >
                   <FileStack className="h-4 w-4" />

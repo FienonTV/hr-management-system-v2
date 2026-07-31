@@ -7,12 +7,14 @@ import { Download, Search, Filter, BellOff, AlertTriangle, Clock, CheckCircle2, 
 import { getAllDocuments, snoozeDocument, getDocumentVersions, deleteEmployeeDocument } from "@/lib/actions/employeeDocuments";
 import type { DocumentContainerWithLatest } from "@/lib/actions/employeeDocuments";
 import type { File as FileRecord } from "@prisma/client";
+import { usePermissions } from "@/lib/hooks/usePermissions";
 
 export default function DocumentsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialStatus = (searchParams.get("status") as "all" | "expired" | "expiring" | "valid") || "all";
   const initialQuery = searchParams.get("q") || "";
+  const { has: hasPermission } = usePermissions();
 
   const [documents, setDocuments] = useState<DocumentContainerWithLatest[]>([]);
   const [status, setStatus] = useState<"all" | "expired" | "expiring" | "valid">(initialStatus);
@@ -126,6 +128,9 @@ export default function DocumentsPage() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   }
 
+  const canUpdate = hasPermission("documents:update");
+  const canDelete = hasPermission("documents:delete");
+
   return (
     <div className="space-y-6">
       <div>
@@ -207,13 +212,15 @@ export default function DocumentsPage() {
                     >
                       <Download className="h-4 w-4" />
                     </a>
-                    <button
-                      onClick={() => handleSnooze(doc.id)}
-                      className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-primary-600"
-                      title="1 Woche ausblenden"
-                    >
-                      <BellOff className="h-4 w-4" />
-                    </button>
+                    {canUpdate && (
+                      <button
+                        onClick={() => handleSnooze(doc.id)}
+                        className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-primary-600"
+                        title="1 Woche ausblenden"
+                      >
+                        <BellOff className="h-4 w-4" />
+                      </button>
+                    )}
                     {doc.employeeId && (
                       <Link
                         href={`/dashboard/modules/employees/${doc.employeeId}?tab=dokumente`}
@@ -223,13 +230,15 @@ export default function DocumentsPage() {
                         <FileText className="h-4 w-4" />
                       </Link>
                     )}
-                    <button
-                      onClick={() => handleDelete(doc.id, doc.employeeId)}
-                      className="rounded-lg p-2 text-gray-500 hover:bg-red-50 hover:text-red-600"
-                      title="In Papierkorb verschieben"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    {canDelete && (
+                      <button
+                        onClick={() => handleDelete(doc.id, doc.employeeId)}
+                        className="rounded-lg p-2 text-gray-500 hover:bg-red-50 hover:text-red-600"
+                        title="In Papierkorb verschieben"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
                 {expanded.has(doc.id) && (

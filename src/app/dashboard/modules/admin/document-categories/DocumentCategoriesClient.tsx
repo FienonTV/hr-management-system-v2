@@ -10,9 +10,10 @@ import {
 
 interface Props {
   categories: DocumentCategory[];
+  canManage: boolean;
 }
 
-export default function DocumentCategoriesClient({ categories }: Props) {
+export default function DocumentCategoriesClient({ categories, canManage }: Props) {
   const [items, setItems] = useState(categories);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -88,40 +89,42 @@ export default function DocumentCategoriesClient({ categories }: Props) {
       )}
 
       <section className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-medium text-gray-900">Neue Kategorie</h2>
-        <form action={handleCreate} className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-5">
-          <input
-            type="text"
-            name="name"
-            placeholder="Name"
-            required
-            className="rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-          />
-          <input
-            type="text"
-            name="description"
-            placeholder="Beschreibung"
-            className="rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 sm:col-span-2"
-          />
-          <div className="flex items-center gap-3">
+        <h2 className="text-lg font-medium text-gray-900">{canManage ? "Neue Kategorie" : "Kategorien"}</h2>
+        {canManage && (
+          <form action={handleCreate} className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-5">
             <input
-              type="color"
-              name="color"
-              defaultValue="#3B82F6"
-              className="h-11 w-11 rounded border border-gray-300 p-1"
+              type="text"
+              name="name"
+              placeholder="Name"
+              required
+              className="rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
-            <label className="flex items-center gap-2 text-sm text-gray-700">
-              <input type="checkbox" name="isActive" defaultChecked className="rounded" />
-              Aktiv
-            </label>
-          </div>
-          <button
-            type="submit"
-            className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
-          >
-            Hinzufügen
-          </button>
-        </form>
+            <input
+              type="text"
+              name="description"
+              placeholder="Beschreibung"
+              className="rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 sm:col-span-2"
+            />
+            <div className="flex items-center gap-3">
+              <input
+                type="color"
+                name="color"
+                defaultValue="#3B82F6"
+                className="h-11 w-11 rounded border border-gray-300 p-1"
+              />
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input type="checkbox" name="isActive" defaultChecked className="rounded" />
+                Aktiv
+              </label>
+            </div>
+            <button
+              type="submit"
+              className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
+            >
+              Hinzufügen
+            </button>
+          </form>
+        )}
       </section>
 
       <section className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
@@ -132,14 +135,14 @@ export default function DocumentCategoriesClient({ categories }: Props) {
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Beschreibung</th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Farbe</th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Status</th>
-              <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">Aktion</th>
+              {canManage && <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">Aktion</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 bg-white">
             {items.map((category) => (
               <tr key={category.id}>
                 <td colSpan={5} className="p-0">
-                  <form action={handleUpdate} className="contents">
+                  <form action={canManage ? handleUpdate : undefined} className="contents">
                     <div className="table-row">
                       <div className="table-cell px-4 py-3 text-sm text-gray-900">
                         <input type="hidden" name="id" value={category.id} />
@@ -148,7 +151,8 @@ export default function DocumentCategoriesClient({ categories }: Props) {
                           name="name"
                           defaultValue={category.name}
                           required
-                          className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-primary-500 focus:outline-none"
+                          disabled={!canManage}
+                          className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-primary-500 focus:outline-none disabled:opacity-60"
                         />
                       </div>
                       <div className="table-cell px-4 py-3 text-sm text-gray-900">
@@ -156,7 +160,8 @@ export default function DocumentCategoriesClient({ categories }: Props) {
                           type="text"
                           name="description"
                           defaultValue={category.description ?? ""}
-                          className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-primary-500 focus:outline-none"
+                          disabled={!canManage}
+                          className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-primary-500 focus:outline-none disabled:opacity-60"
                         />
                       </div>
                       <div className="table-cell px-4 py-3 text-sm text-gray-900">
@@ -164,7 +169,8 @@ export default function DocumentCategoriesClient({ categories }: Props) {
                           type="color"
                           name="color"
                           defaultValue={category.color}
-                          className="h-8 w-8 rounded border border-gray-300 p-0.5"
+                          disabled={!canManage}
+                          className="h-8 w-8 rounded border border-gray-300 p-0.5 disabled:opacity-60"
                         />
                       </div>
                       <div className="table-cell px-4 py-3 text-sm text-gray-900">
@@ -173,27 +179,30 @@ export default function DocumentCategoriesClient({ categories }: Props) {
                             type="checkbox"
                             name="isActive"
                             defaultChecked={category.isActive}
-                            className="rounded"
+                            disabled={!canManage}
+                            className="rounded disabled:opacity-60"
                           />
                           {category.isActive ? "Aktiv" : "Inaktiv"}
                         </label>
                       </div>
-                      <div className="table-cell px-4 py-3 text-right text-sm font-medium">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            type="submit"
-                            className="rounded bg-primary-100 px-3 py-1 text-xs text-primary-700 hover:bg-primary-200"
-                          >
-                            Speichern
-                          </button>
-                          <button
-                            formAction={handleRemove}
-                            className="rounded bg-red-50 px-3 py-1 text-xs text-red-700 hover:bg-red-100"
-                          >
-                            Löschen
-                          </button>
+                      {canManage && (
+                        <div className="table-cell px-4 py-3 text-right text-sm font-medium">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              type="submit"
+                              className="rounded bg-primary-100 px-3 py-1 text-xs text-primary-700 hover:bg-primary-200"
+                            >
+                              Speichern
+                            </button>
+                            <button
+                              formAction={handleRemove}
+                              className="rounded bg-red-50 px-3 py-1 text-xs text-red-700 hover:bg-red-100"
+                            >
+                              Löschen
+                            </button>
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   </form>
                 </td>

@@ -1,5 +1,4 @@
 import { withTenant } from "./db/tenant";
-import { headers } from "next/headers";
 import type { Prisma } from "@prisma/client";
 
 export type AuditAction =
@@ -93,9 +92,16 @@ export async function logAudit({
   resourceId,
   metadata,
 }: LogAuditParams) {
-  const headerList = await headers();
-  const userAgent = headerList.get("user-agent") || "unknown";
-  const ipAddress = headerList.get("x-forwarded-for") || "unknown";
+  let userAgent = "unknown";
+  let ipAddress = "unknown";
+  try {
+    const { headers } = await import("next/headers");
+    const headerList = await headers();
+    userAgent = headerList.get("user-agent") || "unknown";
+    ipAddress = headerList.get("x-forwarded-for") || "unknown";
+  } catch {
+    // next/headers is unavailable on the client / pages dir; fall back to defaults.
+  }
 
   return withTenant(tenantId, async (tx) => {
     return tx.auditLog.create({

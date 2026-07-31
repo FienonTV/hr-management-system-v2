@@ -79,6 +79,19 @@ export async function hasPermission(
 }
 
 /**
+ * Liefert die effektiven Permission-Keys des aktuellen Users.
+ * Brauchbar für clientseitige UI-Gates (Buttons ein-/ausblenden).
+ */
+export async function getCurrentUserPermissions(): Promise<Set<string>> {
+  const session = await auth();
+  if (!session?.user) {
+    return new Set();
+  }
+  const tenantId = getEffectiveTenantId(session);
+  return getEffectivePermissions(session.user.id, tenantId);
+}
+
+/**
  * Prüft die Berechtigung für die aktuelle Session und liefert tenantId + session zurück.
  * Wirft Fehler bei fehlender Authentifizierung oder Berechtigung.
  */

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Files, X, Download, CheckCircle, ChevronRight, ChevronLeft, GripVertical, Plus } from "lucide-react";
 import { getDocumentTemplates, getTemplateCustomVariablesForMany, generateDocumentGroup } from "@/lib/actions/documentTemplates";
 import { getDocumentCategories } from "@/lib/actions/documentCategories";
+import { usePermissions } from "@/lib/hooks/usePermissions";
 
 interface Template {
   id: string;
@@ -74,6 +75,7 @@ export default function GroupGenerateDocumentModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [generatedFileId, setGeneratedFileId] = useState<string | null>(null);
+  const { has: hasPermission } = usePermissions();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -643,10 +645,16 @@ export default function GroupGenerateDocumentModal({
               </button>
             )}
 
-            {!generatedFileId && step === "meta" && (
+            {!generatedFileId && step === "meta" && hasPermission("documents:generate") && (
               <button onClick={handleGenerate} disabled={loading} className="flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50">
                 <Files className="h-4 w-4" />
                 {loading ? "Wird generiert…" : "Generieren & Speichern"}
+              </button>
+            )}
+            {!generatedFileId && step === "meta" && !hasPermission("documents:generate") && (
+              <button disabled className="flex items-center gap-2 rounded-lg bg-gray-300 px-4 py-2 text-sm font-medium text-white cursor-not-allowed">
+                <Files className="h-4 w-4" />
+                Keine Berechtigung
               </button>
             )}
           </div>

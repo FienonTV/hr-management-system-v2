@@ -24,12 +24,14 @@ import { useEffect, useCallback } from "react";
 interface TemplateEditorProps {
   initialContent?: string;
   onChange: (html: string) => void;
+  readOnly?: boolean;
 }
 
-export function TemplateEditor({ initialContent = "", onChange }: TemplateEditorProps) {
+export function TemplateEditor({ initialContent = "", onChange, readOnly = false }: TemplateEditorProps) {
   const editor = useEditor({
     immediatelyRender: false,
     enableInputRules: false,
+    editable: !readOnly,
     extensions: [
       StarterKit.configure({ heading: false, orderedList: false }),
       Underline,
@@ -40,7 +42,7 @@ export function TemplateEditor({ initialContent = "", onChange }: TemplateEditor
     editorProps: {
       attributes: {
         class:
-          "min-h-full px-4 py-3 text-sm text-gray-900 focus:outline-none prose prose-sm max-w-none",
+          `min-h-full px-4 py-3 text-sm text-gray-900 focus:outline-none prose prose-sm max-w-none ${readOnly ? "bg-gray-50 cursor-not-allowed" : ""}`,
       },
     },
     onUpdate: ({ editor }) => {
@@ -54,10 +56,13 @@ export function TemplateEditor({ initialContent = "", onChange }: TemplateEditor
   });
 
   useEffect(() => {
-    if (editor && initialContent && editor.getHTML() !== initialContent && initialContent !== "<p></p>") {
-      editor.commands.setContent(initialContent);
+    if (editor) {
+      editor.setEditable(!readOnly);
+      if (initialContent && editor.getHTML() !== initialContent && initialContent !== "<p></p>") {
+        editor.commands.setContent(initialContent);
+      }
     }
-  }, [editor, initialContent]);
+  }, [editor, initialContent, readOnly]);
 
   const insertVariable = useCallback(
     (key: string) => {
@@ -99,6 +104,7 @@ export function TemplateEditor({ initialContent = "", onChange }: TemplateEditor
 
   return (
     <div className="space-y-4">
+      <div className={`${readOnly ? "opacity-60 pointer-events-none" : ""}`}>
       <div>
         <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">
           Variable einfügen – klicken, um an Cursor-Position einzufügen
@@ -117,9 +123,10 @@ export function TemplateEditor({ initialContent = "", onChange }: TemplateEditor
           ))}
         </div>
       </div>
+      </div>
 
       <div className="rounded-lg border border-gray-300 overflow-hidden flex flex-col" style={{ minHeight: 360 }}>
-        <div className="flex flex-wrap items-center gap-1 border-b border-gray-200 bg-gray-50 px-3 py-2">
+        <div className={`flex flex-wrap items-center gap-1 border-b border-gray-200 bg-gray-50 px-3 py-2 ${readOnly ? "opacity-50 pointer-events-none" : ""}`}>
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleBold().run()}
             active={editor.isActive("bold")}
