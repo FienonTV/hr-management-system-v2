@@ -1,7 +1,7 @@
 ﻿import { getEmployees } from "@/lib/actions/employees";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import EmployeesClient from "./EmployeesClient";
+import EmployeesClient, { type EmployeeWithRelations } from "./EmployeesClient";
 
 export default async function EmployeesPage() {
   const session = await auth();
@@ -9,7 +9,7 @@ export default async function EmployeesPage() {
 
   try {
     const employees = await getEmployees();
-    return <EmployeesClient initialEmployees={employees} />;
+    return <EmployeesClient initialEmployees={employees as unknown as EmployeeWithRelations[]} />;
   } catch (e) {
     return (
       <div className="p-4 bg-red-50 text-red-600 rounded-md">

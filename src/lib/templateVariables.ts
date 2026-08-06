@@ -4,7 +4,12 @@
 
 import type { Employee, Prisma } from "@prisma/client";
 
-type EmployeeWithAddress = Employee & { address?: Prisma.JsonValue | null };
+type EmployeeWithAddress = Employee & {
+  address?: Prisma.JsonValue | null;
+  positionName?: string | null;
+  departmentName?: string | null;
+  payGradeName?: string | null;
+};
 
 function formatDate(date: Date | null | undefined): string {
   if (!date) return "[nicht angegeben]";
@@ -66,8 +71,8 @@ export function buildVariableMap(
     geschlecht: employee.gender ?? "[nicht angegeben]",
 
     // Kontakt & Beschäftigung
-    position: val(employee.position),
-    abteilung: val(employee.department),
+    position: val(employee.positionName),
+    abteilung: val(employee.departmentName),
     email: val(employee.email),
     telefon: val(employee.phone),
     beschaeftigungsart: employee.employmentType ?? "[nicht angegeben]",
@@ -101,8 +106,8 @@ export function buildVariableMap(
     lastName: val(employee.lastName),
     employeeNumber: val(employee.employeeNumber),
     birthDate: formatDate(employee.birthDate),
-    position_en: val(employee.position),
-    department_en: val(employee.department),
+    position_en: val(employee.positionName),
+    department_en: val(employee.departmentName),
     email_en: val(employee.email),
     phone_en: val(employee.phone),
     startDate: formatDate(employee.startDate),

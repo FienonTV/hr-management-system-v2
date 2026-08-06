@@ -33,6 +33,10 @@ model Tenant {
   invitationTokens    InvitationToken[]
   documentCategories DocumentCategory[]
   documentTemplates  DocumentTemplate[]
+  departments        Department[]
+  positions          Position[]
+  payGrades          PayGrade[]
+  customFieldDefinitions CustomFieldDefinition[]
 
   @@map("tenants")
 }
@@ -424,16 +428,26 @@ model Employee {
   lastName       String           @map("last_name")
   email          String?
   phone          String?
-  position       String?
-  department     String?
+  positionId     String?          @map("position_id")
+  departmentId   String?          @map("department_id")
+  payGradeId     String?          @map("pay_grade_id")
   employmentType EmploymentType?  @map("employment_type")
   status         EmploymentStatus @default(ACTIVE)
   birthDate      DateTime?        @map("birth_date")
   gender         Gender           @default(NOT_SPECIFIED)
   startDate      DateTime?        @map("start_date")
   exitDate       DateTime?        @map("exit_date")
+  hourlyWage     Decimal?         @map("hourly_wage") @db.Decimal(10, 2)
+  vacationDays   Int?           @map("vacation_days")
+  probationEndDate DateTime?      @map("probation_end_date")
+  fixedTermEndDate DateTime?      @map("fixed_term_end_date")
+  keyNumber      String?          @map("key_number")
+  chipNumber     String?          @map("chip_number")
+  driverLicenseClasses String?  @map("driver_license_classes")
+  forkliftLicense Boolean?       @map("forklift_license")
   address        Json?
   sensitiveData  Json?            @map("sensitive_data") // taxId, socialSecurity, iban, bic, emergencyContact etc.
+  customFields   Json?            @map("custom_fields") // user-defined field values
   notes          String?
   createdAt      DateTime         @default(now()) @map("created_at")
   updatedAt      DateTime         @updatedAt @map("updated_at")
@@ -442,11 +456,15 @@ model Employee {
   userAccount User?
   files       File[]
   documentContainers DocumentContainer[]
+  department  Department?          @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  position    Position?            @relation(fields: [positionId], references: [id], onDelete: SetNull)
+  payGrade    PayGrade?            @relation(fields: [payGradeId], references: [id], onDelete: SetNull)
 
   @@unique([tenantId, employeeNumber])
   @@index([tenantId])
   @@index([tenantId, status])
-  @@index([tenantId, department])
+  @@index([tenantId, departmentId])
+  @@index([tenantId, positionId])
   @@index([tenantId, lastName])
   @@map("employees")
 }
@@ -484,4 +502,97 @@ model InvitationToken {
   @@index([tenantId, email, status])
   @@index([tenantId, status])
   @@map("invitation_tokens")
+}
+
+// ------------------------------------------------------------------
+// MODULE: Employee Master Data Catalogs
+// ------------------------------------------------------------------
+
+model Department {
+  id          String    @id @default(cuid())
+  tenantId    String    @map("tenant_id")
+  name        String
+  code        String?
+  description String?
+  managerId   String?   @map("manager_id")
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employees  Employee[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive])
+  @@map("departments")
+}
+
+model Position {
+  id          String    @id @default(cuid())
+  tenantId    String    @map("tenant_id")
+  name        String
+  code        String?
+  description String?
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employees  Employee[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive])
+  @@map("positions")
+}
+
+model PayGrade {
+  id           String    @id @default(cuid())
+  tenantId     String    @map("tenant_id")
+  name         String
+  code         String?
+  description  String?
+  tariffGroup  String?   @map("tariff_group")
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employees  Employee[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive])
+  @@map("pay_grades")
+}
+
+enum CustomFieldType {
+  TEXT
+  NUMBER
+  DATE
+  BOOLEAN
+  SELECT
+  MULTI_SELECT
+
+  @@map("custom_field_type")
+}
+
+model CustomFieldDefinition {
+  id          String          @id @default(cuid())
+  tenantId    String          @map("tenant_id")
+  appliesTo   String          @map("applies_to") // e.g. "employee"
+  key         String
+  name        String
+  description String?
+  fieldType   CustomFieldType @map("field_type")
+  isRequired  Boolean         @default(false) @map("is_required")
+  options     Json?           // { values: string[] } for SELECT / MULTI_SELECT
+  sortOrder   Int             @default(0) @map("sort_order")
+  isActive    Boolean         @default(true) @map("is_active")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, appliesTo, key])
+  @@index([tenantId, appliesTo, isActive])
+  @@map("custom_field_definitions")
 }

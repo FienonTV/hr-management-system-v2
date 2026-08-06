@@ -5,10 +5,13 @@ import Link from "next/link";
 import { ShieldCheck, FileText, ArrowLeft } from "lucide-react";
 import { getEmployeeById } from "@/lib/actions/employees";
 import { listFiles } from "@/lib/actions/files";
+import { getDepartments, getPositions, getPayGrades } from "@/lib/actions/employeeCatalogs";
+import { getCustomFieldDefinitions } from "@/lib/actions/employeeCatalogs";
 import StammdatenTab from "../StammdatenTab";
 import DocumentsTab from "../DocumentsTab";
 import UserTab from "../UserTab";
 import type { Employee, FileItem } from "../types";
+import type { StammdatenTabProps } from "../StammdatenTab";
 
 type Tab = "stammdaten" | "dokumente" | "user";
 
@@ -18,16 +21,30 @@ export default function EmployeeEditPage({ params }: { params: Promise<{ id: str
   const [activeTab, setActiveTab] = useState<Tab>("stammdaten");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
+  const [positions, setPositions] = useState<{ id: string; name: string }[]>([]);
+  const [payGrades, setPayGrades] = useState<{ id: string; name: string }[]>([]);
+  const [customFields, setCustomFields] = useState<StammdatenTabProps["customFields"]>([]);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
         const { id } = await params;
-        const empData = await getEmployeeById(id);
+        const [empData, depts, pos, pgs, defs] = await Promise.all([
+          getEmployeeById(id),
+          getDepartments(),
+          getPositions(),
+          getPayGrades(),
+          getCustomFieldDefinitions("employee"),
+        ]);
         if (!cancelled) {
           if (empData) {
-            setEmployee(empData);
+            setEmployee(empData as unknown as Employee);
+            setDepartments(depts);
+            setPositions(pos);
+            setPayGrades(pgs);
+            setCustomFields(defs as unknown as StammdatenTabProps["customFields"]);
             const fileResult = await listFiles({ employeeId: id, limit: 100 });
             setFiles(fileResult.files);
           } else {
@@ -103,7 +120,15 @@ export default function EmployeeEditPage({ params }: { params: Promise<{ id: str
         </nav>
       </div>
 
-      {activeTab === "stammdaten" && <StammdatenTab employee={employee} />}
+      {activeTab === "stammdaten" && (
+        <StammdatenTab
+          employee={employee}
+          departments={departments}
+          positions={positions}
+          payGrades={payGrades}
+          customFields={customFields.map((d) => ({ ...d, options: d.options }))}
+        />
+      )}
       {activeTab === "dokumente" && <DocumentsTab employeeId={employee.id} employee={employee} />}
       {activeTab === "user" && <UserTab employeeId={employee.id} email={employee.email} />}
     </div>

@@ -2,11 +2,16 @@
 
 import { useState, useMemo, useCallback } from "react";
 import Link from "next/link";
-import { Plus, User as UserIcon, Search, X, ChevronDown, ChevronUp, SlidersHorizontal, RotateCcw } from "lucide-react";
+import { Plus, User as UserIcon, Search, X, ChevronDown, ChevronUp, SlidersHorizontal, RotateCcw, Download } from "lucide-react";
 import EmployeeRow from "./EmployeeRow";
 import type { Employee, User } from "@prisma/client";
+import { exportEmployeesToCSV } from "@/lib/actions/employees";
 
-type EmployeeWithUser = Employee & { userAccount?: User | null };
+export type EmployeeWithRelations = Employee & {
+  userAccount?: User | null;
+  position?: { id: string; name: string } | null;
+  department?: { id: string; name: string } | null;
+};
 
 type SortKey = "name" | "email" | "position" | "department" | "status" | "startDate";
 type SortDirection = "asc" | "desc";
@@ -16,7 +21,7 @@ interface SortState {
 }
 
 interface EmployeesClientProps {
-  initialEmployees: EmployeeWithUser[];
+  initialEmployees: EmployeeWithRelations[];
 }
 
 const statusLabels: Record<string, string> = {
@@ -49,7 +54,7 @@ function normalizeSearch(text: string): string {
     .replace(/[\u0300-\u036f]/g, "");
 }
 
-function matchesSearch(employee: EmployeeWithUser, query: string): boolean {
+function matchesSearch(employee: EmployeeWithRelations, query: string): boolean {
   if (!query.trim()) return true;
   const q = normalizeSearch(query);
   const haystack = [
@@ -57,8 +62,8 @@ function matchesSearch(employee: EmployeeWithUser, query: string): boolean {
     employee.lastName,
     employee.email,
     employee.employeeNumber,
-    employee.position,
-    employee.department,
+    employee.position?.name,
+    employee.department?.name,
     employee.status,
     employee.userAccount?.email,
     employee.userAccount?.firstName,
@@ -89,7 +94,7 @@ function compareDate(a: Date | null | undefined, b: Date | null | undefined): nu
   return a.getTime() - b.getTime();
 }
 
-function sortEmployees(employees: EmployeeWithUser[], sort: SortState): EmployeeWithUser[] {
+function sortEmployees(employees: EmployeeWithRelations[], sort: SortState): EmployeeWithRelations[] {
   const { key, direction } = sort;
   const sorted = [...employees].sort((a, b) => {
     let cmp = 0;
@@ -101,10 +106,10 @@ function sortEmployees(employees: EmployeeWithUser[], sort: SortState): Employee
         cmp = compareString(a.email, b.email);
         break;
       case "position":
-        cmp = compareString(a.position, b.position);
+        cmp = compareString(a.position?.name, b.position?.name);
         break;
       case "department":
-        cmp = compareString(a.department, b.department);
+        cmp = compareString(a.department?.name, b.department?.name);
         break;
       case "status":
         cmp = compareString(a.status, b.status);
@@ -130,9 +135,13 @@ export default function EmployeesClient({ initialEmployees }: EmployeesClientPro
 
   const departments = useMemo(
     () =>
-      Array.from(new Set(allEmployees.map((e) => e.department).filter((d): d is string => Boolean(d)))).sort((a, b) =>
-        a.localeCompare(b, "de")
-      ),
+      Array.from(
+        new Map(
+          allEmployees
+            .filter((e) => e.department)
+            .map((e) => [e.department!.id, e.department!])
+        ).values()
+      ).sort((a, b) => a.name.localeCompare(b.name, "de")),
     [allEmployees]
   );
 
@@ -151,7 +160,7 @@ export default function EmployeesClient({ initialEmployees }: EmployeesClientPro
 
     // Department filter
     if (selectedDepartment) {
-      result = result.filter((e) => e.department === selectedDepartment);
+      result = result.filter((e) => e.department?.id === selectedDepartment);
     }
 
     // Date range filter
@@ -201,13 +210,36 @@ export default function EmployeesClient({ initialEmployees }: EmployeesClientPro
           <h1 className="text-3xl font-bold text-gray-900">Mitarbeiter</h1>
           <p className="mt-2 text-sm text-gray-600">Verwalten Sie alle Mitarbeiter-Stammdaten</p>
         </div>
-        <Link
-          href="/dashboard/modules/employees/new"
-          className="flex items-center space-x-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 transition-colors"
-        >
-          <Plus className="h-5 w-5" />
-          <span>Neuer Mitarbeiter</span>
-        </Link>
+        <div className="flex items-center space-x-2">
+          <button
+            type="button"
+            onClick={async () => {
+              const result = await exportEmployeesToCSV();
+              if (result.success && result.csv) {
+                const blob = new Blob([result.csv], { type: "text/csv;charset=utf-8;" });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = `Mitarbeiter_${new Date().toISOString().slice(0, 10)}.csv`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+              }
+            }}
+            className="flex items-center space-x-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            <Download className="h-5 w-5" />
+            <span>Export CSV</span>
+          </button>
+          <Link
+            href="/dashboard/modules/employees/new"
+            className="flex items-center space-x-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 transition-colors"
+          >
+            <Plus className="h-5 w-5" />
+            <span>Neuer Mitarbeiter</span>
+          </Link>
+        </div>
       </div>
 
       <div className="space-y-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
@@ -296,8 +328,8 @@ export default function EmployeesClient({ initialEmployees }: EmployeesClientPro
               >
                 <option value="">Alle Abteilungen</option>
                 {departments.map((dept) => (
-                  <option key={dept} value={dept}>
-                    {dept}
+                  <option key={dept.id} value={dept.id}>
+                    {dept.name}
                   </option>
                 ))}
               </select>

@@ -16,7 +16,11 @@ const statusLabels: Record<string, string> = {
   TERMINATED: "Ausgetreten",
 };
 
-export default function EmployeeRow({ employee }: { employee: Employee & { userAccount?: { id: string } | null } }) {
+interface EmployeeRowProps {
+  employee: Employee & { userAccount?: { id: string } | null; position?: { name: string } | null; department?: { name: string } | null };
+}
+
+export default function EmployeeRow({ employee }: EmployeeRowProps) {
   const router = useRouter();
 
   return (
@@ -40,8 +44,8 @@ export default function EmployeeRow({ employee }: { employee: Employee & { userA
         </div>
       </td>
       <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">{employee.email || '-'}</td>
-      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">{employee.position || '-'}</td>
-      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">{employee.department || '-'}</td>
+      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">{employee.position?.name || '-'}</td>
+      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">{employee.department?.name || '-'}</td>
       <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
         <span
           className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${

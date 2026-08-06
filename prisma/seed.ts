@@ -28,7 +28,7 @@ async function main() {
     },
   });
 
-  const hashedPassword = await bcrypt.hash('admin12345!', 12);
+  const hashedPassword = await bcrypt.hash('admin123', 12);
 
   await prisma.user.upsert({
     where: {
@@ -53,6 +53,7 @@ async function main() {
     { key: 'employees:update', module: 'employees', resource: 'employee', action: 'update', description: 'Mitarbeiter bearbeiten' },
     { key: 'employees:delete', module: 'employees', resource: 'employee', action: 'delete', description: 'Mitarbeiter löschen' },
     { key: 'employees:invite', module: 'employees', resource: 'employee', action: 'invite', description: 'Mitarbeiter einladen' },
+    { key: 'employees:export', module: 'employees', resource: 'employee', action: 'export', description: 'Mitarbeiter als CSV exportieren' },
     { key: 'roles:read', module: 'roles', resource: 'role', action: 'read', description: 'Rollen anzeigen' },
     { key: 'roles:create', module: 'roles', resource: 'role', action: 'create', description: 'Rollen erstellen' },
     { key: 'roles:update', module: 'roles', resource: 'role', action: 'update', description: 'Rollen bearbeiten' },
@@ -61,6 +62,7 @@ async function main() {
     { key: 'files:read', module: 'files', resource: 'file', action: 'read', description: 'Dateien anzeigen' },
     { key: 'files:create', module: 'files', resource: 'file', action: 'create', description: 'Dateien hochladen' },
     { key: 'files:delete', module: 'files', resource: 'file', action: 'delete', description: 'Dateien löschen' },
+    { key: 'files:manage', module: 'files', resource: 'file', action: 'manage', description: 'Alle Dateien verwalten' },
     { key: 'documents:read', module: 'documents', resource: 'document', action: 'read', description: 'Dokumente anzeigen' },
     { key: 'documents:create', module: 'documents', resource: 'document', action: 'create', description: 'Dokumente erstellen' },
     { key: 'documents:update', module: 'documents', resource: 'document', action: 'update', description: 'Dokumente bearbeiten' },
@@ -72,6 +74,10 @@ async function main() {
     { key: 'settings:update', module: 'settings', resource: 'tenantSetting', action: 'update', description: 'Einstellungen bearbeiten' },
     { key: 'tenant:manage', module: 'admin', resource: 'tenant', action: 'manage', description: 'Firmen-Einstellungen verwalten' },
     { key: 'modules:manage', module: 'modules', resource: 'module', action: 'manage', description: 'Module verwalten' },
+    { key: 'departments:manage', module: 'employees', resource: 'department', action: 'manage', description: 'Abteilungen verwalten' },
+    { key: 'positions:manage', module: 'employees', resource: 'position', action: 'manage', description: 'Positionen verwalten' },
+    { key: 'payGrades:manage', module: 'employees', resource: 'payGrade', action: 'manage', description: 'Entgeltgruppen verwalten' },
+    { key: 'customFields:manage', module: 'employees', resource: 'customFieldDefinition', action: 'manage', description: 'Benutzerdefinierte Felder verwalten' },
   ];
 
   const permissions = await Promise.all(

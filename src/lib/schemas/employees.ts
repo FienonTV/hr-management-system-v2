@@ -48,19 +48,29 @@ export const employeeBaseSchema = z.object({
   employeeNumber: z.string().trim().max(100).optional(),
   firstName: z.string().min(1).max(100),
   lastName: z.string().min(1).max(100),
-  email: z.string().email().max(255).optional(),
-  phone: z.string().trim().max(50).optional(),
-  position: z.string().trim().max(100).optional(),
-  department: z.string().trim().max(100).optional(),
-  employmentType: employmentTypeSchema.optional(),
-  status: employmentStatusSchema.optional(),
-  birthDate: dateTransform.optional(),
-  gender: genderSchema.optional(),
-  startDate: dateTransform.optional(),
-  exitDate: dateTransform.optional(),
-  address: addressSchema.optional(),
-  sensitiveData: sensitiveDataSchema.optional(),
-  notes: z.string().trim().max(2000).optional(),
+  email: z.union([z.string().email().max(255), z.string().length(0), z.null()]).optional(),
+  phone: z.union([z.string().trim().max(50), z.string().length(0), z.null()]).optional(),
+  positionId: z.union([z.string().trim().max(100), z.string().length(0), z.null()]).optional(),
+  departmentId: z.union([z.string().trim().max(100), z.string().length(0), z.null()]).optional(),
+  payGradeId: z.union([z.string().trim().max(100), z.string().length(0), z.null()]).optional(),
+  employmentType: employmentTypeSchema.nullable().optional(),
+  status: employmentStatusSchema.nullable().optional(),
+  birthDate: z.union([dateTransform, z.null()]).optional(),
+  gender: genderSchema.nullable().optional(),
+  startDate: z.union([dateTransform, z.null()]).optional(),
+  exitDate: z.union([dateTransform, z.null()]).optional(),
+  hourlyWage: z.union([z.coerce.number().min(0), z.null()]).optional(),
+  vacationDays: z.union([z.coerce.number().min(0).pipe(z.number().int()), z.null()]).optional(),
+  probationEndDate: z.union([dateTransform, z.null()]).optional(),
+  fixedTermEndDate: z.union([dateTransform, z.null()]).optional(),
+  keyNumber: z.union([z.string().trim().max(100), z.string().length(0), z.null()]).optional(),
+  chipNumber: z.union([z.string().trim().max(100), z.string().length(0), z.null()]).optional(),
+  driverLicenseClasses: z.union([z.string().trim().max(100), z.string().length(0), z.null()]).optional(),
+  forkliftLicense: z.coerce.boolean().nullable().optional(),
+  address: addressSchema.nullable().optional(),
+  sensitiveData: sensitiveDataSchema.nullable().optional(),
+  customFields: z.record(z.string(), z.unknown()).nullable().optional(),
+  notes: z.union([z.string().trim().max(2000), z.string().length(0), z.null()]).optional(),
 });
 
 export const createEmployeeSchema = employeeBaseSchema.extend({
@@ -68,8 +78,8 @@ export const createEmployeeSchema = employeeBaseSchema.extend({
   userRoleIds: z.array(z.string()).optional(),
 }).transform((data) => ({
   ...data,
-  status: data.status ?? "ACTIVE",
-  gender: data.gender ?? "NOT_SPECIFIED",
+  status: data.status ?? undefined,
+  gender: data.gender ?? undefined,
 }));
 
 export const updateEmployeeSchema = employeeBaseSchema;
@@ -85,16 +95,26 @@ export interface EmployeeBaseInput {
   lastName: string;
   email?: string;
   phone?: string;
-  position?: string;
-  department?: string;
+  positionId?: string;
+  departmentId?: string;
+  payGradeId?: string;
   employmentType?: z.infer<typeof employmentTypeSchema>;
   status?: z.infer<typeof employmentStatusSchema>;
   birthDate?: DateInput;
   gender?: z.infer<typeof genderSchema>;
   startDate?: DateInput;
   exitDate?: DateInput;
+  hourlyWage?: number;
+  vacationDays?: number;
+  probationEndDate?: DateInput;
+  fixedTermEndDate?: DateInput;
+  keyNumber?: string;
+  chipNumber?: string;
+  driverLicenseClasses?: string;
+  forkliftLicense?: boolean;
   address?: AddressInput;
   sensitiveData?: SensitiveDataInput;
+  customFields?: Record<string, unknown>;
   notes?: string;
 
   // Flat UI fields (normalized by server action)

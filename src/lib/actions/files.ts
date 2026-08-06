@@ -5,8 +5,10 @@ import { requirePermission } from "@/lib/permissions";
 import { logAudit, logFileAccess } from "@/lib/audit";
 import { prismaAdmin } from "@/lib/db/prisma";
 import { getStorageAdapter } from "@/lib/storage";
+import { extractTextFromBuffer } from "@/lib/extractText";
 import { randomUUID } from "node:crypto";
 import { createHash } from "node:crypto";
+import { Prisma } from "@prisma/client";
 import type { FileCategory, File as PrismaFile, DocumentCategory } from "@prisma/client";
 
 export type FileRecord = PrismaFile & {
@@ -247,6 +249,8 @@ export async function uploadFile(
     return { success: false, error: "Speichern der Datei fehlgeschlagen" };
   }
 
+  const textContent = await extractTextFromBuffer(data, mimeType);
+
   return withTenant(tenantId, async (tx) => {
   const created = await tx.file.create({
     data: {
@@ -268,6 +272,7 @@ export async function uploadFile(
       notes: options.notes ?? null,
       version: 1,
       isLatestVersion: true,
+      textContent,
       documentCategories: {
         create: (options.documentCategoryIds ?? []).map((categoryId) => ({ categoryId })),
       },
@@ -526,6 +531,8 @@ export async function uploadNewVersion(
       return { success: false, error: "Speichern der Datei fehlgeschlagen" };
     }
 
+    const textContent = await extractTextFromBuffer(data, mimeType);
+
     const versionOfId = existing.versionOfId || existing.id;
     const version = existing.version + 1;
 
@@ -549,6 +556,7 @@ export async function uploadNewVersion(
         version,
         versionOfId,
         isLatestVersion: true,
+        textContent,
       },
     });
 
@@ -604,4 +612,210 @@ async function checkPermission(permission: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+export async function searchFiles(query: string, options?: {
+  limit?: number;
+  employeeId?: string;
+  parentType?: string;
+  parentId?: string;
+}): Promise<{ files: FileRecord[] }> {
+  await requirePermission("files:read");
+  const { tenantId, userId, employeeId } = await getUserContext();
+  const hasManage = await checkPermission("files:manage");
+
+  const rawQuery = query.trim();
+
+  return withTenant(tenantId, async (tx) => {
+    const where = {
+      ...buildFileWhere(hasManage, userId, employeeId, options),
+      isDeleted: false,
+    };
+
+    if (!rawQuery) {
+      const files = await tx.file.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        take: Math.min(options?.limit ?? 50, 200),
+        include: { documentCategories: { include: { category: true } } },
+      });
+      return { files };
+    }
+
+    const terms = rawQuery
+      .replace(/[%,_*?]/g, " ")
+      .split(/\s+/)
+      .filter(Boolean);
+
+    if (terms.length === 0) {
+      const files = await tx.file.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        take: Math.min(options?.limit ?? 50, 200),
+        include: { documentCategories: { include: { category: true } } },
+      });
+      return { files };
+    }
+
+    const patterns = terms.map((t) => `%${t}%`);
+    const fragments = patterns.flatMap((pattern) => [
+      Prisma.sql`"original_name" ILIKE ${pattern}`,
+      Prisma.sql`"title" ILIKE ${pattern}`,
+      Prisma.sql`"text_content" ILIKE ${pattern}`,
+    ]);
+    const searchClause = Prisma.sql`(${Prisma.join(fragments, " OR ")})`;
+    const limit = Math.min(options?.limit ?? 50, 200);
+
+    const searchQuery = Prisma.sql`
+      SELECT * FROM "files"
+      WHERE "tenant_id" = ${tenantId}
+        AND "is_deleted" = false
+        AND ${searchClause}
+      ORDER BY "created_at" DESC
+      LIMIT ${limit}
+    `;
+
+    const files = await tx.$queryRaw<FileRecord[]>(searchQuery);
+
+    // Apply visibility filter again because $queryRaw bypasses RLS
+    const visible = hasManage
+      ? files
+      : files.filter((f) => f.uploadedById === userId || (employeeId && f.employeeId === employeeId));
+    return { files: visible };
+  });
+}
+
+export async function listDeletedFiles(options?: {
+  limit?: number;
+  offset?: number;
+}): Promise<{ files: FileRecord[]; total: number }> {
+  await requirePermission("files:manage");
+  const { tenantId } = await getUserContext();
+  const limit = Math.min(options?.limit ?? 50, 200);
+  const offset = options?.offset ?? 0;
+
+  return withTenant(tenantId, async (tx) => {
+    const [files, total] = await Promise.all([
+      tx.file.findMany({
+        where: { isDeleted: true },
+        orderBy: { deletedAt: "desc" },
+        take: limit,
+        skip: offset,
+        include: { documentCategories: { include: { category: true } } },
+      }),
+      tx.file.count({ where: { isDeleted: true } }),
+    ]);
+    return { files, total };
+  });
+}
+
+export async function cleanupTrash(days: number = 30): Promise<{ deleted: number }> {
+  await requirePermission("files:manage");
+  const { tenantId, userId } = await getUserContext();
+
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+
+  return withTenant(tenantId, async (tx) => {
+    const stale = await tx.file.findMany({
+      where: { isDeleted: true, deletedAt: { lt: cutoff } },
+    });
+
+    for (const file of stale) {
+      await getStorageAdapter().delete(file.storageKey);
+      await tx.file.delete({ where: { id: file.id } });
+      await logAudit({
+        tenantId,
+        userId,
+        action: "file.cleanup_delete",
+        resourceType: "file",
+        resourceId: file.id,
+        metadata: { originalName: file.originalName, storageKey: file.storageKey },
+      });
+    }
+
+    return { deleted: stale.length };
+  });
+}
+
+const INDEXABLE_MIME_TYPES = new Set([
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/plain",
+]);
+
+export async function reindexFilesWithoutText(limit: number = 50): Promise<{ indexed: number; remaining: number; failed: number }> {
+  await requirePermission("files:manage");
+  const { tenantId, userId } = await getUserContext();
+
+  // Load candidates outside a transaction because text extraction is slow.
+  const candidates = await prismaAdmin.file.findMany({
+    where: {
+      tenantId,
+      isDeleted: false,
+      textContent: null,
+      mimeType: { in: Array.from(INDEXABLE_MIME_TYPES) },
+    },
+    orderBy: { createdAt: "asc" },
+    take: Math.max(1, Math.min(limit, 100)),
+  });
+
+  let indexed = 0;
+  let failed = 0;
+
+  for (const file of candidates) {
+    try {
+      const buffer = await getStorageAdapter().download(file.storageKey);
+      const textContent = await extractTextFromBuffer(buffer, file.mimeType);
+      await prismaAdmin.file.update({
+        where: { id: file.id },
+        data: { textContent },
+      });
+      await logAudit({
+        tenantId,
+        userId,
+        action: "file.reindex_text",
+        resourceType: "file",
+        resourceId: file.id,
+        metadata: { originalName: file.originalName, mimeType: file.mimeType },
+      });
+      indexed++;
+    } catch (e) {
+      failed++;
+      console.error(`Reindex failed for ${file.id}`, e);
+    }
+  }
+
+  const remaining = await prismaAdmin.file.count({
+    where: {
+      tenantId,
+      isDeleted: false,
+      textContent: null,
+      mimeType: { in: Array.from(INDEXABLE_MIME_TYPES) },
+    },
+  });
+
+  return { indexed, remaining, failed };
+}
+
+function buildFileWhere(
+  hasManage: boolean,
+  userId: string,
+  employeeId: string | null,
+  options?: { employeeId?: string; parentType?: string; parentId?: string }
+): Record<string, unknown> {
+  const where: Record<string, unknown> = {
+    isDeleted: false,
+    employeeId: options?.employeeId,
+    parentType: options?.parentType,
+    parentId: options?.parentId,
+  };
+
+  if (!hasManage) {
+    where.OR = [
+      { uploadedById: userId },
+      ...(employeeId ? [{ employeeId }] : []),
+    ];
+  }
+  return where;
 }

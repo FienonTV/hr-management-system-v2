@@ -8,6 +8,8 @@ import { getAllDocuments, snoozeDocument, getDocumentVersions, deleteEmployeeDoc
 import type { DocumentContainerWithLatest } from "@/lib/actions/employeeDocuments";
 import type { File as FileRecord } from "@prisma/client";
 import { usePermissions } from "@/lib/hooks/usePermissions";
+import { FileSearch } from "@/components/files/FileSearch";
+import { reindexFilesWithoutText } from "@/lib/actions/files";
 
 export default function DocumentsPage() {
   const router = useRouter();
@@ -24,6 +26,8 @@ export default function DocumentsPage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [versions, setVersions] = useState<Record<string, FileRecord[]>>({});
   const [loadingVersions, setLoadingVersions] = useState<Set<string>>(new Set());
+  const [reindexing, setReindexing] = useState(false);
+  const [reindexResult, setReindexResult] = useState<{ indexed: number; remaining: number; failed: number } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -104,6 +108,20 @@ export default function DocumentsPage() {
     setDocuments((prev) => prev.filter((d) => d.id !== containerId));
   }
 
+  async function handleReindex() {
+    setReindexing(true);
+    setReindexResult(null);
+    setError(null);
+    try {
+      const result = await reindexFilesWithoutText(50);
+      setReindexResult(result);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Indizierung fehlgeschlagen");
+    } finally {
+      setReindexing(false);
+    }
+  }
+
   function statusBadge(doc: DocumentContainerWithLatest) {
     const now = new Date();
     const expires = doc.expiresAt ? new Date(doc.expiresAt) : null;
@@ -165,6 +183,25 @@ export default function DocumentsPage() {
       </div>
 
       {error && <div className="rounded-md bg-red-50 p-4 text-sm text-red-600">{error}</div>}
+
+      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-gray-900">Globale Dateisuche</h2>
+          <button
+            onClick={handleReindex}
+            disabled={reindexing}
+            className="inline-flex items-center rounded-md bg-primary-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+          >
+            {reindexing ? "Wird indiziert..." : "Index nachholen"}
+          </button>
+        </div>
+        <FileSearch />
+        {reindexResult && (
+          <div className="mt-3 text-sm text-gray-600">
+            {reindexResult.indexed} indiziert, {reindexResult.failed} fehlgeschlagen, {reindexResult.remaining} verbleibend.
+          </div>
+        )}
+      </div>
 
       <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
         {loading ? (

@@ -6,11 +6,36 @@ import { useState } from "react";
 import { updateEmployee, deleteEmployee } from "@/lib/actions/employees";
 import type { Employee } from "./types";
 import { Field, toDateInputValue } from "./Field";
+import CustomFieldInputs from "../CustomFieldInputs";
 
-export default function StammdatenTab({ employee }: { employee: Employee }) {
+export interface StammdatenTabProps {
+  employee: Employee;
+  departments: { id: string; name: string }[];
+  positions: { id: string; name: string }[];
+  payGrades: { id: string; name: string }[];
+  customFields: {
+    id: string;
+    key: string;
+    name: string;
+    description?: string | null;
+    fieldType: "TEXT" | "NUMBER" | "DATE" | "BOOLEAN" | "SELECT" | "MULTI_SELECT";
+    isRequired: boolean;
+    options: { values: string[] } | null;
+    sortOrder: number;
+  }[];
+}
+
+export default function StammdatenTab({ employee, departments, positions, payGrades, customFields }: StammdatenTabProps) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [customValues, setCustomValues] = useState<Record<string, unknown>>(() => {
+    const init: Record<string, unknown> = {};
+    for (const def of customFields) {
+      init[def.key] = employee[def.key as keyof Employee] ?? null;
+    }
+    return init;
+  });
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -26,8 +51,6 @@ export default function StammdatenTab({ employee }: { employee: Employee }) {
       "lastName",
       "email",
       "employeeNumber",
-      "position",
-      "department",
       "employmentType",
       "status",
       "phone",
@@ -42,6 +65,9 @@ export default function StammdatenTab({ employee }: { employee: Employee }) {
       "bic",
       "emergencyContactName",
       "emergencyContactPhone",
+      "keyNumber",
+      "chipNumber",
+      "driverLicenseClasses",
       "notes",
     ];
 
@@ -52,12 +78,52 @@ export default function StammdatenTab({ employee }: { employee: Employee }) {
       }
     }
 
-    const dateFields = ["birthDate", "startDate", "exitDate"];
+    for (const key of ["departmentId", "positionId", "payGradeId"]) {
+      const value = formData.get(key);
+      if (value && value !== "") {
+        data[key] = String(value);
+      } else {
+        data[key] = null;
+      }
+    }
+
+    const decimalFields = ["hourlyWage"];
+    for (const key of decimalFields) {
+      const value = formData.get(key);
+      if (value && value !== "") {
+        data[key] = Number(String(value).replace(",", "."));
+      } else {
+        data[key] = null;
+      }
+    }
+
+    const intFields = ["vacationDays"];
+    for (const key of intFields) {
+      const value = formData.get(key);
+      if (value && value !== "") {
+        data[key] = Number(String(value));
+      } else {
+        data[key] = null;
+      }
+    }
+
+    const boolFields = ["forkliftLicense"];
+    for (const key of boolFields) {
+      data[key] = formData.get(key) === "on";
+    }
+
+    const dateFields = ["birthDate", "startDate", "exitDate", "probationEndDate", "fixedTermEndDate"];
     for (const key of dateFields) {
       const value = formData.get(key);
       if (value && String(value) !== "") {
         data[key] = new Date(String(value)).toISOString();
+      } else {
+        data[key] = null;
       }
+    }
+
+    for (const [key, value] of Object.entries(customValues)) {
+      data[key] = value;
     }
 
     try {
@@ -96,17 +162,67 @@ export default function StammdatenTab({ employee }: { employee: Employee }) {
         <Field label="Nachname" name="lastName" defaultValue={employee.lastName} required />
         <Field label="E-Mail" name="email" type="email" defaultValue={employee.email ?? ""} />
         <Field label="Mitarbeiternummer" name="employeeNumber" defaultValue={employee.employeeNumber ?? ""} />
-        <Field label="Position" name="position" defaultValue={employee.position ?? ""} />
-        <Field label="Abteilung" name="department" defaultValue={employee.department ?? ""} />
+
+        <div className="space-y-2">
+          <label htmlFor="departmentId" className="block text-sm font-medium text-gray-700">Abteilung</label>
+          <select
+            id="departmentId"
+            name="departmentId"
+            defaultValue={employee.departmentId ?? ""}
+            className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+          >
+            <option value="">–</option>
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="space-y-2">
+          <label htmlFor="positionId" className="block text-sm font-medium text-gray-700">Position</label>
+          <select
+            id="positionId"
+            name="positionId"
+            defaultValue={employee.positionId ?? ""}
+            className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+          >
+            <option value="">–</option>
+            {positions.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="space-y-2">
+          <label htmlFor="payGradeId" className="block text-sm font-medium text-gray-700">Entgeltgruppe</label>
+          <select
+            id="payGradeId"
+            name="payGradeId"
+            defaultValue={employee.payGradeId ?? ""}
+            className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+          >
+            <option value="">–</option>
+            {payGrades.map((pg) => (
+              <option key={pg.id} value={pg.id}>
+                {pg.name}
+              </option>
+            ))}
+          </select>
+        </div>
 
         <div className="space-y-2">
           <label htmlFor="employmentType" className="block text-sm font-medium text-gray-700">Beschäftigungsart</label>
           <select
             id="employmentType"
             name="employmentType"
-            defaultValue={employee.employmentType ?? "FULL_TIME"}
+            defaultValue={employee.employmentType ?? ""}
             className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
+            <option value="">–</option>
             <option value="FULL_TIME">Vollzeit</option>
             <option value="PART_TIME">Teilzeit</option>
             <option value="FREELANCE">Freelancer</option>
@@ -120,9 +236,10 @@ export default function StammdatenTab({ employee }: { employee: Employee }) {
           <select
             id="status"
             name="status"
-            defaultValue={employee.status ?? "ACTIVE"}
+            defaultValue={employee.status ?? ""}
             className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
+            <option value="">–</option>
             <option value="ACTIVE">Aktiv</option>
             <option value="ONBOARDING">Einstellung</option>
             <option value="INACTIVE">Inaktiv</option>
@@ -137,9 +254,10 @@ export default function StammdatenTab({ employee }: { employee: Employee }) {
           <select
             id="gender"
             name="gender"
-            defaultValue={employee.gender ?? "NOT_SPECIFIED"}
+            defaultValue={employee.gender ?? ""}
             className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
+            <option value="">–</option>
             <option value="MALE">Männlich</option>
             <option value="FEMALE">Weiblich</option>
             <option value="DIVERS">Divers</option>
@@ -150,6 +268,24 @@ export default function StammdatenTab({ employee }: { employee: Employee }) {
         <Field label="Geburtsdatum" name="birthDate" type="date" defaultValue={toDateInputValue(employee.birthDate)} />
         <Field label="Eintrittsdatum" name="startDate" type="date" defaultValue={toDateInputValue(employee.startDate)} />
         <Field label="Austrittsdatum" name="exitDate" type="date" defaultValue={toDateInputValue(employee.exitDate)} />
+        <Field label="Probezeit bis" name="probationEndDate" type="date" defaultValue={toDateInputValue((employee as unknown as Record<string, unknown>).probationEndDate as string | null)} />
+        <Field label="Befristet bis" name="fixedTermEndDate" type="date" defaultValue={toDateInputValue((employee as unknown as Record<string, unknown>).fixedTermEndDate as string | null)} />
+        <Field label="Stundensatz" name="hourlyWage" type="number" defaultValue={String(((employee as unknown as Record<string, unknown>).hourlyWage as number | null) ?? "")} />
+        <Field label="Urlaubstage" name="vacationDays" type="number" defaultValue={String(((employee as unknown as Record<string, unknown>).vacationDays as number | null) ?? "")} />
+        <Field label="Schlüsselnummer" name="keyNumber" defaultValue={((employee as unknown as Record<string, unknown>).keyNumber as string | null) ?? ""} />
+        <Field label="Chipnummer" name="chipNumber" defaultValue={((employee as unknown as Record<string, unknown>).chipNumber as string | null) ?? ""} />
+        <Field label="Führerscheinklassen" name="driverLicenseClasses" defaultValue={((employee as unknown as Record<string, unknown>).driverLicenseClasses as string | null) ?? ""} />
+
+        <div className="flex items-center gap-2">
+          <input
+            id="forkliftLicense"
+            name="forkliftLicense"
+            type="checkbox"
+            defaultChecked={!!((employee as unknown as Record<string, unknown>).forkliftLicense)}
+            className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+          />
+          <label htmlFor="forkliftLicense" className="text-sm font-medium text-gray-700">Gabelstaplerschein</label>
+        </div>
       </div>
 
       <div className="border-t border-gray-200 pt-6">
@@ -173,6 +309,20 @@ export default function StammdatenTab({ employee }: { employee: Employee }) {
           <Field label="Telefon" name="emergencyContactPhone" defaultValue={employee.emergencyContactPhone ?? ""} />
         </div>
       </div>
+
+      {customFields.length > 0 && (
+        <div className="border-t border-gray-200 pt-6">
+          <h3 className="text-lg font-medium text-gray-900">Zusätzliche Felder</h3>
+          <div className="mt-4 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <CustomFieldInputs
+              fields={customFields}
+              values={customValues}
+              onChange={(key, value) => setCustomValues((prev) => ({ ...prev, [key]: value }))}
+              disabled={saving}
+            />
+          </div>
+        </div>
+      )}
 
       <div className="border-t border-gray-200 pt-6">
         <label htmlFor="notes" className="block text-sm font-medium text-gray-700">Notizen</label>

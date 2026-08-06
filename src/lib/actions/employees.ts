@@ -4,7 +4,7 @@ import { withTenant } from "@/lib/db/tenant";
 import { requirePermission } from "@/lib/permissions";
 import { revalidatePath } from 'next/cache';
 import type { Employee, User } from "@prisma/client";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import {
   createEmployeeSchema,
   updateEmployeeSchema,
@@ -14,6 +14,21 @@ import {
 import type { EmployeeBaseInput, CreateEmployeeInput, UpdateEmployeeInput } from "@/lib/schemas/employees";
 import { logAudit } from "@/lib/audit";
 import { hashPassword, generateTemporaryPassword } from "@/lib/passwordPolicy";
+import { getCustomFieldDefinitions } from "@/lib/actions/employeeCatalogs";
+
+function cleanEmployeeDataForPrisma(data: Record<string, unknown>): any {
+  const cleaned = { ...data };
+  for (const key of ["positionId", "departmentId", "payGradeId", "email", "phone", "employeeNumber", "keyNumber", "chipNumber", "driverLicenseClasses", "notes"]) {
+    if (cleaned[key] === null) delete cleaned[key];
+  }
+  for (const key of ["address", "sensitiveData", "customFields"]) {
+    if (cleaned[key] === null || (typeof cleaned[key] === "object" && cleaned[key] !== null && Object.keys(cleaned[key] as object).length === 0)) {
+      delete cleaned[key];
+    }
+  }
+  if (cleaned["forkliftLicense"] === null) cleaned["forkliftLicense"] = false;
+  return cleaned;
+}
 
 function normalizeCreateEmployeeInput(data: CreateEmployeeInput): CreateEmployeeInput {
   return normalizeEmployeeInput(data) as CreateEmployeeInput;
@@ -67,7 +82,69 @@ function normalizeEmployeeInput(data: EmployeeBaseInput | Partial<EmployeeBaseIn
   return normalized;
 }
 
-export async function getEmployees(search?: string): Promise<(Employee & { userAccount?: User | null })[]> {
+function extractCustomFields(input: Record<string, unknown>, definitions: { key: string; fieldType: string }[]) {
+  const result: Record<string, unknown> = {};
+  for (const def of definitions) {
+    if (input[`custom_${def.key}`] !== undefined) {
+      result[def.key] = input[`custom_${def.key}`];
+    }
+  }
+  return result;
+}
+
+function parseCustomFieldValue(def: { fieldType: string; key: string; options: unknown; name: string }, value: unknown): unknown {
+  if (value === undefined || value === null || value === "") return null;
+  switch (def.fieldType) {
+    case "TEXT":
+      return String(value).trim();
+    case "NUMBER": {
+      const n = Number(value);
+      if (isNaN(n)) throw new Error(`Ungültige Zahl für ${def.name}`);
+      return n;
+    }
+    case "DATE": {
+      const date = new Date(String(value));
+      if (isNaN(date.getTime())) throw new Error(`Ungültiges Datum für ${def.name}`);
+      return date.toISOString();
+    }
+    case "BOOLEAN":
+      return value === true || value === "true" || value === "on";
+    case "SELECT":
+      return String(value).trim();
+    case "MULTI_SELECT": {
+      if (!Array.isArray(value)) throw new Error(`Ungültiger Wert für ${def.name}`);
+      return value.map(String);
+    }
+    default:
+      return value;
+  }
+}
+
+function validateCustomFields(input: Record<string, unknown>, definitions: { key: string; fieldType: string; name: string; isRequired: boolean; options: unknown }[]) {
+  const result: Record<string, unknown> = {};
+  for (const def of definitions) {
+    const raw = input[def.key];
+    if ((raw === undefined || raw === null || raw === "") && def.isRequired) {
+      throw new Error(`Feld ${def.name} ist erforderlich`);
+    }
+    const parsed = parseCustomFieldValue(def, raw);
+    if (parsed !== null && parsed !== undefined) {
+      const options = def.options as { values?: string[] } | null | undefined;
+      if (def.fieldType === "SELECT" && options?.values?.length && !options.values.includes(String(parsed))) {
+        throw new Error(`Ungültiger Wert für ${def.name}`);
+      }
+      if (def.fieldType === "MULTI_SELECT" && options?.values?.length && Array.isArray(parsed)) {
+        for (const v of parsed) {
+          if (!options.values.includes(String(v))) throw new Error(`Ungültiger Wert für ${def.name}`);
+        }
+      }
+      result[def.key] = parsed;
+    }
+  }
+  return result;
+}
+
+export async function getEmployees(search?: string): Promise<(Omit<Employee, "hourlyWage"> & { hourlyWage?: number | null; userAccount?: User | null; position?: { name: string } | null; department?: { name: string } | null })[]> {
   const { tenantId } = await requirePermission("employees:read");
   return withTenant(tenantId, async (tx) => {
     const normalizedSearch = search?.trim();
@@ -78,28 +155,32 @@ export async function getEmployees(search?: string): Promise<(Employee & { userA
         { lastName: { contains: normalizedSearch, mode: "insensitive" } },
         { email: { contains: normalizedSearch, mode: "insensitive" } },
         { employeeNumber: { contains: normalizedSearch, mode: "insensitive" } },
-        { position: { contains: normalizedSearch, mode: "insensitive" } },
-        { department: { contains: normalizedSearch, mode: "insensitive" } },
+        { position: { name: { contains: normalizedSearch, mode: "insensitive" } } },
+        { department: { name: { contains: normalizedSearch, mode: "insensitive" } } },
       ];
     }
     return await tx.employee.findMany({
       where,
       orderBy: { lastName: 'asc' },
-      include: { userAccount: true },
-    });
+      include: { userAccount: true, position: { select: { id: true, name: true } }, department: { select: { id: true, name: true } } },
+    }).then((employees) =>
+      employees.map((employee) => ({
+        ...employee,
+        hourlyWage: employee.hourlyWage ? Number(employee.hourlyWage) : null,
+      }))
+    );
   });
 }
 
-export async function getEmployeeById(id: string): Promise<(Employee & { userAccount?: User | null }) | null> {
+export async function getEmployeeById(id: string): Promise<(Employee & { userAccount?: User | null; position?: { name: string; id: string } | null; department?: { name: string; id: string } | null; payGrade?: { name: string; id: string } | null; customFields?: Prisma.JsonValue | null }) | null> {
   const { tenantId } = await requirePermission("employees:read");
   return withTenant(tenantId, async (tx) => {
     const employee = await tx.employee.findUnique({
       where: { id },
-      include: { userAccount: true },
+      include: { userAccount: true, position: { select: { name: true, id: true } }, department: { select: { name: true, id: true } }, payGrade: { select: { name: true, id: true } } },
     });
     if (!employee) return null;
 
-    // Flatten JSON address/sensitiveData fields for the UI form.
     const address = employee.address as Record<string, string | null | undefined> | null | undefined;
     const sensitiveData = employee.sensitiveData as Record<string, string | null | undefined> | null | undefined;
 
@@ -115,7 +196,8 @@ export async function getEmployeeById(id: string): Promise<(Employee & { userAcc
       bic: sensitiveData?.bic ?? null,
       emergencyContactName: sensitiveData?.emergencyContactName ?? null,
       emergencyContactPhone: sensitiveData?.emergencyContactPhone ?? null,
-    };
+      hourlyWage: employee.hourlyWage ? Number(employee.hourlyWage) : null,
+    } as unknown as Employee & { userAccount?: User | null; position?: { name: string; id: string } | null; department?: { name: string; id: string } | null; payGrade?: { name: string; id: string } | null; customFields?: Prisma.JsonValue | null };
   });
 }
 
@@ -137,7 +219,7 @@ export async function createEmployee(data: CreateEmployeeInput): Promise<{ succe
   const { tenantId, session } = await requirePermission("employees:create");
   const normalized = normalizeCreateEmployeeInput(data);
   const validated = parseCreateEmployeeInput(normalized);
-  const { createUserAccount, userRoleIds, ...employeeData } = validated;
+  const { createUserAccount, userRoleIds, customFields: rawCustomFields, ...employeeData } = validated;
 
   return withTenant(tenantId, async (tx) => {
     if (employeeData.email) {
@@ -158,11 +240,18 @@ export async function createEmployee(data: CreateEmployeeInput): Promise<{ succe
       }
     }
 
+    let customFields: Record<string, unknown> | null = null;
+    if (rawCustomFields) {
+      const defs = await getCustomFieldDefinitions("employee");
+      customFields = validateCustomFields(rawCustomFields, defs);
+    }
+
     const employee = await tx.employee.create({
-      data: {
+      data: cleanEmployeeDataForPrisma({
         ...employeeData,
+        customFields,
         tenantId,
-      },
+      } as unknown as Record<string, unknown>),
     });
 
     let user: User | null = null;
@@ -231,6 +320,7 @@ export async function updateEmployee(id: string, data: UpdateEmployeeInput): Pro
   const { tenantId, session } = await requirePermission("employees:update");
   const normalized = normalizeUpdateEmployeeInput(data);
   const validated = parseUpdateEmployeeInput(normalized);
+  const { customFields: rawCustomFields, ...employeeData } = validated;
 
   return withTenant(tenantId, async (tx) => {
     const existing = await tx.employee.findUnique({ where: { id } });
@@ -256,9 +346,15 @@ export async function updateEmployee(id: string, data: UpdateEmployeeInput): Pro
       }
     }
 
+    let customFields: Record<string, unknown> | null = null;
+    if (rawCustomFields) {
+      const defs = await getCustomFieldDefinitions("employee");
+      customFields = validateCustomFields(rawCustomFields, defs);
+    }
+
     const employee = await tx.employee.update({
       where: { id },
-      data: validated,
+      data: cleanEmployeeDataForPrisma({ ...employeeData, customFields } as unknown as Record<string, unknown>),
     });
 
     revalidatePath('/dashboard/modules/employees');
@@ -305,5 +401,89 @@ export async function deleteEmployee(id: string): Promise<{ success: boolean; er
     });
 
     return { success: true };
+  });
+}
+
+export async function exportEmployeesToCSV(): Promise<{ success: boolean; csv?: string; error?: string }> {
+  const { tenantId } = await requirePermission("employees:export");
+  const defs = await getCustomFieldDefinitions("employee");
+
+  return withTenant(tenantId, async (tx) => {
+    const employees = await tx.employee.findMany({
+      where: { tenantId },
+      include: { department: { select: { name: true } }, position: { select: { name: true } }, payGrade: { select: { name: true } } },
+      orderBy: { lastName: 'asc' },
+    });
+
+    const headers = [
+      "Mitarbeiternummer",
+      "Vorname",
+      "Nachname",
+      "E-Mail",
+      "Telefon",
+      "Abteilung",
+      "Position",
+      "Entgeltgruppe",
+      "Beschäftigungsart",
+      "Status",
+      "Geburtsdatum",
+      "Eintrittsdatum",
+      "Austrittsdatum",
+      "Stundensatz",
+      "Urlaubstage",
+      "Straße",
+      "PLZ",
+      "Stadt",
+      "Land",
+      "Steuer-ID",
+      "Sozialversicherungsnummer",
+      "IBAN",
+      "BIC",
+      "Notfallkontakt Name",
+      "Notfallkontakt Telefon",
+      ...defs.map((d) => d.name),
+    ];
+
+    const escapeCsv = (value: unknown) => {
+      if (value === null || value === undefined) return "";
+      const str = String(value);
+      if (/[",\n\r]/.test(str)) return `"${str.replace(/"/g, '""')}"`;
+      return str;
+    };
+
+    const rows = employees.map((e) => [
+      e.employeeNumber,
+      e.firstName,
+      e.lastName,
+      e.email,
+      e.phone,
+      e.department?.name ?? "",
+      e.position?.name ?? "",
+      (e as unknown as { payGrade?: { name?: string } }).payGrade?.name ?? "",
+      e.employmentType,
+      e.status,
+      e.birthDate ? new Date(e.birthDate).toLocaleDateString("de-DE") : "",
+      e.startDate ? new Date(e.startDate).toLocaleDateString("de-DE") : "",
+      e.exitDate ? new Date(e.exitDate).toLocaleDateString("de-DE") : "",
+      (e as unknown as Record<string, unknown>).hourlyWage,
+      (e as unknown as Record<string, unknown>).vacationDays,
+      ((e.address as Record<string, string> | null | undefined) ?? {}).street,
+      ((e.address as Record<string, string> | null | undefined) ?? {}).zip,
+      ((e.address as Record<string, string> | null | undefined) ?? {}).city,
+      ((e.address as Record<string, string> | null | undefined) ?? {}).country,
+      ((e.sensitiveData as Record<string, string> | null | undefined) ?? {}).taxId,
+      ((e.sensitiveData as Record<string, string> | null | undefined) ?? {}).socialSecurityNumber,
+      ((e.sensitiveData as Record<string, string> | null | undefined) ?? {}).iban,
+      ((e.sensitiveData as Record<string, string> | null | undefined) ?? {}).bic,
+      ((e.sensitiveData as Record<string, string> | null | undefined) ?? {}).emergencyContactName,
+      ((e.sensitiveData as Record<string, string> | null | undefined) ?? {}).emergencyContactPhone,
+      ...defs.map((d) => {
+        const raw = (e.customFields as Record<string, unknown> | null | undefined)?.[d.key];
+        return Array.isArray(raw) ? raw.join(", ") : raw;
+      }),
+    ]);
+
+    const csv = [headers.join(";"), ...rows.map((row) => row.map(escapeCsv).join(";"))].join("\n");
+    return { success: true, csv };
   });
 }

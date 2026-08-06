@@ -5,10 +5,23 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createEmployee } from "@/lib/actions/employees";
 import { getRoles } from "@/lib/actions/roles";
+import { getDepartments, getPositions, getPayGrades, getCustomFieldDefinitions } from "@/lib/actions/employeeCatalogs";
+import CustomFieldInputs from "../CustomFieldInputs";
 import type { CreateEmployeeInput } from "@/lib/schemas/employees";
 import { CheckCircle2, X, AlertCircle } from "lucide-react";
 
 type Role = { id: string; name: string };
+
+type CustomFieldDef = {
+  id: string;
+  key: string;
+  name: string;
+  description?: string | null;
+  fieldType: "TEXT" | "NUMBER" | "DATE" | "BOOLEAN" | "SELECT" | "MULTI_SELECT";
+  isRequired: boolean;
+  options: { values: string[] } | null;
+  sortOrder: number;
+};
 
 type Toast = {
   id: string;
@@ -21,13 +34,32 @@ export default function NewEmployeePage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [roles, setRoles] = useState<Role[]>([]);
+  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
+  const [positions, setPositions] = useState<{ id: string; name: string }[]>([]);
+  const [payGrades, setPayGrades] = useState<{ id: string; name: string }[]>([]);
+  const [customFields, setCustomFields] = useState<CustomFieldDef[]>([]);
+  const [customValues, setCustomValues] = useState<Record<string, unknown>>({});
   const [createUser, setCreateUser] = useState(false);
   const [userRoleIds, setUserRoleIds] = useState<string[]>([]);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   useEffect(() => {
-    getRoles().then(setRoles).catch(console.error);
+    Promise.all([
+      getRoles(),
+      getDepartments(),
+      getPositions(),
+      getPayGrades(),
+      getCustomFieldDefinitions("employee"),
+    ])
+      .then(([r, d, p, pg, cf]) => {
+        setRoles(r);
+        setDepartments(d);
+        setPositions(p);
+        setPayGrades(pg);
+        setCustomFields(cf as unknown as CustomFieldDef[]);
+      })
+      .catch(console.error);
   }, []);
 
   function addToast(message: string, variant: "success" | "error") {
@@ -40,6 +72,22 @@ export default function NewEmployeePage() {
 
   function removeToast(id: string) {
     setToasts((prev) => prev.filter((t) => t.id !== id));
+  }
+
+  function parseNumberOrUndefined(value: FormDataEntryValue | null): number | undefined {
+    if (!value) return undefined;
+    const str = String(value).trim().replace(",", ".");
+    if (str === "") return undefined;
+    const n = Number(str);
+    return isNaN(n) ? undefined : n;
+  }
+
+  function parseIntOrUndefined(value: FormDataEntryValue | null): number | undefined {
+    if (!value) return undefined;
+    const str = String(value).trim();
+    if (str === "") return undefined;
+    const n = Number(str);
+    return isNaN(n) ? undefined : n;
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -65,19 +113,29 @@ export default function NewEmployeePage() {
       return;
     }
 
-    const data = {
+    const data: CreateEmployeeInput & { createUserAccount: boolean; userRoleIds?: string[]; customFields?: Record<string, unknown> } = {
       employeeNumber: String(formData.get("employeeNumber") ?? "").trim() || undefined,
       firstName,
       lastName,
       email: email || undefined,
       phone: String(formData.get("phone") ?? "").trim() || undefined,
-      position: String(formData.get("position") ?? "").trim() || undefined,
-      department: String(formData.get("department") ?? "").trim() || undefined,
+      departmentId: String(formData.get("departmentId") ?? "").trim() || undefined,
+      positionId: String(formData.get("positionId") ?? "").trim() || undefined,
+      payGradeId: String(formData.get("payGradeId") ?? "").trim() || undefined,
       employmentType: (String(formData.get("employmentType") ?? "").trim() || undefined) as CreateEmployeeInput["employmentType"],
       status: (String(formData.get("status") ?? "").trim() || undefined) as CreateEmployeeInput["status"],
       birthDate: String(formData.get("birthDate") ?? "").trim() || undefined,
       gender: (String(formData.get("gender") ?? "").trim() || undefined) as CreateEmployeeInput["gender"],
       startDate: String(formData.get("startDate") ?? "").trim() || undefined,
+      exitDate: String(formData.get("exitDate") ?? "").trim() || undefined,
+      probationEndDate: String(formData.get("probationEndDate") ?? "").trim() || undefined,
+      fixedTermEndDate: String(formData.get("fixedTermEndDate") ?? "").trim() || undefined,
+      hourlyWage: parseNumberOrUndefined(formData.get("hourlyWage")),
+      vacationDays: parseIntOrUndefined(formData.get("vacationDays")),
+      keyNumber: String(formData.get("keyNumber") ?? "").trim() || undefined,
+      chipNumber: String(formData.get("chipNumber") ?? "").trim() || undefined,
+      driverLicenseClasses: String(formData.get("driverLicenseClasses") ?? "").trim() || undefined,
+      forkliftLicense: formData.get("forkliftLicense") === "on",
       street: String(formData.get("street") ?? "").trim() || undefined,
       zip: String(formData.get("zip") ?? "").trim() || undefined,
       city: String(formData.get("city") ?? "").trim() || undefined,
@@ -91,6 +149,7 @@ export default function NewEmployeePage() {
       notes: String(formData.get("notes") ?? "").trim() || undefined,
       createUserAccount: createUser,
       userRoleIds: createUser ? userRoleIds : undefined,
+      customFields: customValues,
     };
 
     try {
@@ -122,9 +181,24 @@ export default function NewEmployeePage() {
     }
   }
 
+  const renderSelect = (name: string, label: string, options: { id: string; name: string }[]) => (
+    <div className="space-y-2">
+      <label htmlFor={name} className="block text-sm font-medium text-gray-700">{label}</label>
+      <select
+        id={name}
+        name={name}
+        className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+      >
+        <option value="">–</option>
+        {options.map((o) => (
+          <option key={o.id} value={o.id}>{o.name}</option>
+        ))}
+      </select>
+    </div>
+  );
+
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      {/* Toasts */}
       <div className="fixed top-4 right-4 z-50 space-y-3">
         {toasts.map((toast) => (
           <div
@@ -165,9 +239,7 @@ export default function NewEmployeePage() {
         className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm space-y-6"
       >
         {error && (
-          <div className="rounded-md bg-red-50 p-4 text-sm text-red-600">
-            {error}
-          </div>
+          <div className="rounded-md bg-red-50 p-4 text-sm text-red-600">{error}</div>
         )}
 
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
@@ -211,28 +283,12 @@ export default function NewEmployeePage() {
 
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           <div className="space-y-2">
-            <label htmlFor="employeeNumber" className="block text-sm font-medium text-gray-700">
-              Mitarbeiternummer
-            </label>
-            <input
-              id="employeeNumber"
-              name="employeeNumber"
-              type="text"
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              placeholder="Mitarbeiternummer"
-            />
+            <label htmlFor="employeeNumber" className="block text-sm font-medium text-gray-700">Mitarbeiternummer</label>
+            <input id="employeeNumber" name="employeeNumber" type="text" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="Mitarbeiternummer" />
           </div>
           <div className="space-y-2">
-            <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
-              Telefon
-            </label>
-            <input
-              id="phone"
-              name="phone"
-              type="tel"
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              placeholder="Telefon"
-            />
+            <label htmlFor="phone" className="block text-sm font-medium text-gray-700">Telefon</label>
+            <input id="phone" name="phone" type="tel" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="Telefon" />
           </div>
         </div>
 
@@ -255,44 +311,17 @@ export default function NewEmployeePage() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-          <div className="space-y-2">
-            <label htmlFor="position" className="block text-sm font-medium text-gray-700">
-              Position
-            </label>
-            <input
-              id="position"
-              name="position"
-              type="text"
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              placeholder="Position"
-            />
-          </div>
-          <div className="space-y-2">
-            <label htmlFor="department" className="block text-sm font-medium text-gray-700">
-              Abteilung
-            </label>
-            <input
-              id="department"
-              name="department"
-              type="text"
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              placeholder="Abteilung"
-            />
-          </div>
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+          {renderSelect("departmentId", "Abteilung", departments)}
+          {renderSelect("positionId", "Position", positions)}
+          {renderSelect("payGradeId", "Entgeltgruppe", payGrades)}
         </div>
 
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
           <div className="space-y-2">
-            <label htmlFor="employmentType" className="block text-sm font-medium text-gray-700">
-              Beschäftigungsart
-            </label>
-            <select
-              id="employmentType"
-              name="employmentType"
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-            >
-              <option value="">Bitte wählen</option>
+            <label htmlFor="employmentType" className="block text-sm font-medium text-gray-700">Beschäftigungsart</label>
+            <select id="employmentType" name="employmentType" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500">
+              <option value="">–</option>
               <option value="FULL_TIME">Vollzeit</option>
               <option value="PART_TIME">Teilzeit</option>
               <option value="FREELANCE">Freelancer</option>
@@ -301,14 +330,9 @@ export default function NewEmployeePage() {
             </select>
           </div>
           <div className="space-y-2">
-            <label htmlFor="status" className="block text-sm font-medium text-gray-700">
-              Status
-            </label>
-            <select
-              id="status"
-              name="status"
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-            >
+            <label htmlFor="status" className="block text-sm font-medium text-gray-700">Status</label>
+            <select id="status" name="status" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500">
+              <option value="">–</option>
               <option value="ACTIVE">Aktiv</option>
               <option value="ONBOARDING">Einstellung</option>
               <option value="INACTIVE">Inaktiv</option>
@@ -316,14 +340,9 @@ export default function NewEmployeePage() {
             </select>
           </div>
           <div className="space-y-2">
-            <label htmlFor="gender" className="block text-sm font-medium text-gray-700">
-              Geschlecht
-            </label>
-            <select
-              id="gender"
-              name="gender"
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-            >
+            <label htmlFor="gender" className="block text-sm font-medium text-gray-700">Geschlecht</label>
+            <select id="gender" name="gender" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500">
+              <option value="">–</option>
               <option value="NOT_SPECIFIED">Keine Angabe</option>
               <option value="MALE">Männlich</option>
               <option value="FEMALE">Weiblich</option>
@@ -332,146 +351,116 @@ export default function NewEmployeePage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-4">
           <div className="space-y-2">
-            <label htmlFor="birthDate" className="block text-sm font-medium text-gray-700">
-              Geburtsdatum
-            </label>
-            <input
-              id="birthDate"
-              name="birthDate"
-              type="date"
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-            />
+            <label htmlFor="birthDate" className="block text-sm font-medium text-gray-700">Geburtsdatum</label>
+            <input id="birthDate" name="birthDate" type="date" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500" />
           </div>
           <div className="space-y-2">
-            <label htmlFor="startDate" className="block text-sm font-medium text-gray-700">
-              Startdatum
-            </label>
-            <input
-              id="startDate"
-              name="startDate"
-              type="date"
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-            />
+            <label htmlFor="startDate" className="block text-sm font-medium text-gray-700">Startdatum</label>
+            <input id="startDate" name="startDate" type="date" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="exitDate" className="block text-sm font-medium text-gray-700">Austrittsdatum</label>
+            <input id="exitDate" name="exitDate" type="date" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="probationEndDate" className="block text-sm font-medium text-gray-700">Probezeit bis</label>
+            <input id="probationEndDate" name="probationEndDate" type="date" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-4">
+          <div className="space-y-2">
+            <label htmlFor="fixedTermEndDate" className="block text-sm font-medium text-gray-700">Befristet bis</label>
+            <input id="fixedTermEndDate" name="fixedTermEndDate" type="date" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="hourlyWage" className="block text-sm font-medium text-gray-700">Stundensatz</label>
+            <input id="hourlyWage" name="hourlyWage" type="number" step="0.01" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="0,00" />
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="vacationDays" className="block text-sm font-medium text-gray-700">Urlaubstage</label>
+            <input id="vacationDays" name="vacationDays" type="number" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+          </div>
+          <div className="flex items-center gap-2 pt-6">
+            <input id="forkliftLicense" name="forkliftLicense" type="checkbox" className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+            <label htmlFor="forkliftLicense" className="text-sm font-medium text-gray-700">Gabelstaplerschein</label>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+          <div className="space-y-2">
+            <label htmlFor="keyNumber" className="block text-sm font-medium text-gray-700">Schlüsselnummer</label>
+            <input id="keyNumber" name="keyNumber" type="text" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="chipNumber" className="block text-sm font-medium text-gray-700">Chipnummer</label>
+            <input id="chipNumber" name="chipNumber" type="text" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="driverLicenseClasses" className="block text-sm font-medium text-gray-700">Führerscheinklassen</label>
+            <input id="driverLicenseClasses" name="driverLicenseClasses" type="text" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500" />
           </div>
         </div>
 
         <div className="space-y-2">
           <p className="text-sm font-medium text-gray-700">Adresse</p>
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-            <input
-              name="street"
-              type="text"
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              placeholder="Straße"
-            />
-            <input
-              name="zip"
-              type="text"
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              placeholder="PLZ"
-            />
-            <input
-              name="city"
-              type="text"
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              placeholder="Ort"
-            />
-            <input
-              name="country"
-              type="text"
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              placeholder="Land"
-            />
+            <input name="street" type="text" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="Straße" />
+            <input name="zip" type="text" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="PLZ" />
+            <input name="city" type="text" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="Ort" />
+            <input name="country" type="text" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="Land" />
           </div>
         </div>
 
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           <div className="space-y-2">
-            <label htmlFor="taxId" className="block text-sm font-medium text-gray-700">
-              Steuer-ID
-            </label>
-            <input
-              id="taxId"
-              name="taxId"
-              type="text"
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              placeholder="Steuer-ID"
-            />
+            <label htmlFor="taxId" className="block text-sm font-medium text-gray-700">Steuer-ID</label>
+            <input id="taxId" name="taxId" type="text" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="Steuer-ID" />
           </div>
           <div className="space-y-2">
-            <label htmlFor="socialSecurityNumber" className="block text-sm font-medium text-gray-700">
-              Sozialversicherungsnummer
-            </label>
-            <input
-              id="socialSecurityNumber"
-              name="socialSecurityNumber"
-              type="text"
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              placeholder="Sozialversicherungsnummer"
-            />
+            <label htmlFor="socialSecurityNumber" className="block text-sm font-medium text-gray-700">Sozialversicherungsnummer</label>
+            <input id="socialSecurityNumber" name="socialSecurityNumber" type="text" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="Sozialversicherungsnummer" />
           </div>
         </div>
 
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           <div className="space-y-2">
-            <label htmlFor="iban" className="block text-sm font-medium text-gray-700">
-              IBAN
-            </label>
-            <input
-              id="iban"
-              name="iban"
-              type="text"
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              placeholder="IBAN"
-            />
+            <label htmlFor="iban" className="block text-sm font-medium text-gray-700">IBAN</label>
+            <input id="iban" name="iban" type="text" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="IBAN" />
           </div>
           <div className="space-y-2">
-            <label htmlFor="bic" className="block text-sm font-medium text-gray-700">
-              BIC
-            </label>
-            <input
-              id="bic"
-              name="bic"
-              type="text"
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              placeholder="BIC"
-            />
+            <label htmlFor="bic" className="block text-sm font-medium text-gray-700">BIC</label>
+            <input id="bic" name="bic" type="text" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="BIC" />
           </div>
         </div>
 
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           <div className="space-y-2">
-            <label htmlFor="emergencyContactName" className="block text-sm font-medium text-gray-700">
-              Notfallkontakt Name
-            </label>
-            <input
-              id="emergencyContactName"
-              name="emergencyContactName"
-              type="text"
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              placeholder="Notfallkontakt Name"
-            />
+            <label htmlFor="emergencyContactName" className="block text-sm font-medium text-gray-700">Notfallkontakt Name</label>
+            <input id="emergencyContactName" name="emergencyContactName" type="text" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="Notfallkontakt Name" />
           </div>
           <div className="space-y-2">
-            <label htmlFor="emergencyContactPhone" className="block text-sm font-medium text-gray-700">
-              Notfallkontakt Telefon
-            </label>
-            <input
-              id="emergencyContactPhone"
-              name="emergencyContactPhone"
-              type="tel"
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              placeholder="Notfallkontakt Telefon"
-            />
+            <label htmlFor="emergencyContactPhone" className="block text-sm font-medium text-gray-700">Notfallkontakt Telefon</label>
+            <input id="emergencyContactPhone" name="emergencyContactPhone" type="tel" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="Notfallkontakt Telefon" />
           </div>
         </div>
+
+        {customFields.length > 0 && (
+          <div className="space-y-2 border-t border-gray-200 pt-4">
+            <p className="text-sm font-medium text-gray-700">Zusätzliche Felder</p>
+            <CustomFieldInputs
+              fields={customFields}
+              values={customValues}
+              onChange={(key, value) => setCustomValues((prev) => ({ ...prev, [key]: value }))}
+              disabled={loading}
+            />
+          </div>
+        )}
 
         <div className="space-y-2">
-          <label htmlFor="notes" className="block text-sm font-medium text-gray-700">
-            Notizen
-          </label>
+          <label htmlFor="notes" className="block text-sm font-medium text-gray-700">Notizen</label>
           <textarea
             id="notes"
             name="notes"

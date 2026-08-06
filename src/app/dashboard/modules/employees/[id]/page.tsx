@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ShieldCheck, FileText, ArrowLeft, Pencil } from "lucide-react";
 import { getEmployeeById } from "@/lib/actions/employees";
 import { listFiles } from "@/lib/actions/files";
+import { getDepartments, getPositions, getPayGrades, getCustomFieldDefinitions } from "@/lib/actions/employeeCatalogs";
 import ReadOnlyStammdaten from "./ReadOnlyStammdaten";
 import DocumentsTab from "./DocumentsTab";
 import UserTab from "./UserTab";
@@ -18,16 +19,30 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
   const [activeTab, setActiveTab] = useState<Tab>("stammdaten");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [departments, setDepartments] = useState<Record<string, string>>({});
+  const [positions, setPositions] = useState<Record<string, string>>({});
+  const [payGrades, setPayGrades] = useState<Record<string, string>>({});
+  const [customFields, setCustomFields] = useState<{ id: string; key: string; name: string; fieldType: "TEXT" | "NUMBER" | "DATE" | "BOOLEAN" | "SELECT" | "MULTI_SELECT" }[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
         const { id } = await params;
-        const empData = await getEmployeeById(id);
+        const [empData, depts, pos, pgs, defs] = await Promise.all([
+          getEmployeeById(id),
+          getDepartments(),
+          getPositions(),
+          getPayGrades(),
+          getCustomFieldDefinitions("employee"),
+        ]);
         if (!cancelled) {
           if (empData) {
-            setEmployee(empData);
+            setEmployee(empData as unknown as Employee);
+            setDepartments(Object.fromEntries(depts.map((d) => [d.id, d.name])));
+            setPositions(Object.fromEntries(pos.map((p) => [p.id, p.name])));
+            setPayGrades(Object.fromEntries(pgs.map((pg) => [pg.id, pg.name])));
+            setCustomFields(defs.map((d) => ({ id: d.id, key: d.key, name: d.name, fieldType: d.fieldType })));
             const fileResult = await listFiles({ employeeId: id, limit: 100 });
             setFiles(fileResult.files);
           } else {
@@ -112,7 +127,15 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
         </nav>
       </div>
 
-      {activeTab === "stammdaten" && <ReadOnlyStammdaten employee={employee} />}
+      {activeTab === "stammdaten" && (
+        <ReadOnlyStammdaten
+          employee={employee}
+          departmentName={departments[(employee as unknown as Record<string, string>).departmentId]}
+          positionName={positions[(employee as unknown as Record<string, string>).positionId]}
+          payGradeName={payGrades[(employee as unknown as Record<string, string>).payGradeId]}
+          customFields={customFields}
+        />
+      )}
       {activeTab === "dokumente" && <DocumentsTab employeeId={employee.id} employee={employee} />}
       {activeTab === "user" && <UserTab employeeId={employee.id} email={employee.email} />}
     </div>
