@@ -2,16 +2,17 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ShieldCheck, FileText, ArrowLeft, Pencil } from "lucide-react";
+import { ShieldCheck, FileText, ArrowLeft, Pencil, Award } from "lucide-react";
 import { getEmployeeById } from "@/lib/actions/employees";
 import { listFiles } from "@/lib/actions/files";
 import { getDepartments, getPositions, getPayGrades, getCustomFieldDefinitions } from "@/lib/actions/employeeCatalogs";
 import ReadOnlyStammdaten from "./ReadOnlyStammdaten";
 import DocumentsTab from "./DocumentsTab";
 import UserTab from "./UserTab";
+import QualifikationenTab from "./QualifikationenTab";
 import type { Employee, FileItem } from "./types";
 
-type Tab = "stammdaten" | "dokumente" | "user";
+type Tab = "stammdaten" | "dokumente" | "user" | "qualifikationen";
 
 export default function EmployeeDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const [employee, setEmployee] = useState<Employee | null>(null);
@@ -77,6 +78,7 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
 
   const tabs = [
     { id: "stammdaten" as Tab, label: "Stammdaten", icon: FileText },
+    { id: "qualifikationen" as Tab, label: "Qualifikationen", icon: Award },
     { id: "dokumente" as Tab, label: "Dokumente", icon: FileText },
     { id: "user" as Tab, label: "Benutzer-Account", icon: ShieldCheck },
   ];
@@ -136,6 +138,7 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
           customFields={customFields}
         />
       )}
+      {activeTab === "qualifikationen" && <QualifikationenTab employeeId={employee.id} />}
       {activeTab === "dokumente" && <DocumentsTab employeeId={employee.id} employee={employee} />}
       {activeTab === "user" && <UserTab employeeId={employee.id} email={employee.email} />}
     </div>
