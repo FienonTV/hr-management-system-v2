@@ -61,7 +61,6 @@ ALTER TABLE "employee_qualifications" ADD CONSTRAINT "employee_qualifications_ce
 
 -- RLS Policies for Phase 2c tables
 ALTER TABLE "qualifications" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "qualifications" FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS qualifications_all ON "qualifications";
 CREATE POLICY qualifications_all ON "qualifications"
   FOR ALL
@@ -69,7 +68,6 @@ CREATE POLICY qualifications_all ON "qualifications"
   WITH CHECK ("tenant_id" = current_setting('app.current_tenant', true));
 
 ALTER TABLE "employee_qualifications" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "employee_qualifications" FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS employee_qualifications_all ON "employee_qualifications";
 CREATE POLICY employee_qualifications_all ON "employee_qualifications"
   FOR ALL
