@@ -49,33 +49,33 @@ export async function createEmployeeQualification(
   const { tenantId, session } = await requirePermission("employees:update");
   const { qualificationId, issuedAt, expiresAt, notes, certificateFile } = data;
 
-  return withTenant(tenantId, async (tx) => {
-    const qualification = await tx.qualification.findUnique({
-      where: { id: qualificationId, tenantId },
+  const qualification = await withTenant(tenantId, async (tx) =>
+    tx.qualification.findUnique({ where: { id: qualificationId, tenantId } })
+  );
+  if (!qualification) {
+    return { success: false, error: "Qualifikation nicht gefunden" };
+  }
+
+  const parsedIssuedAt = parseDate(issuedAt);
+  let parsedExpiresAt = parseDate(expiresAt);
+  if (!parsedExpiresAt && parsedIssuedAt && qualification.validityInMonths) {
+    parsedExpiresAt = addMonths(parsedIssuedAt, qualification.validityInMonths);
+  }
+
+  let certificateFileId: string | undefined;
+  if (certificateFile && certificateFile.size > 0) {
+    const uploadResult = await uploadFile(certificateFile, {
+      employeeId,
+      category: "CERTIFICATE",
+      title: `Zertifikat ${qualification.name}`,
     });
-    if (!qualification) {
-      return { success: false, error: "Qualifikation nicht gefunden" };
+    if (!uploadResult.success || !uploadResult.fileId) {
+      return { success: false, error: uploadResult.error || "Zertifikat-Upload fehlgeschlagen" };
     }
+    certificateFileId = uploadResult.fileId;
+  }
 
-    const parsedIssuedAt = parseDate(issuedAt);
-    let parsedExpiresAt = parseDate(expiresAt);
-    if (!parsedExpiresAt && parsedIssuedAt && qualification.validityInMonths) {
-      parsedExpiresAt = addMonths(parsedIssuedAt, qualification.validityInMonths);
-    }
-
-    let certificateFileId: string | undefined;
-    if (certificateFile && certificateFile.size > 0) {
-      const uploadResult = await uploadFile(certificateFile, {
-        employeeId,
-        category: "CERTIFICATE",
-        title: `Zertifikat ${qualification.name}`,
-      });
-      if (!uploadResult.success || !uploadResult.fileId) {
-        return { success: false, error: uploadResult.error || "Zertifikat-Upload fehlgeschlagen" };
-      }
-      certificateFileId = uploadResult.fileId;
-    }
-
+  return withTenant(tenantId, async (tx) => {
     const record = await tx.employeeQualification.create({
       data: {
         tenantId,
@@ -116,42 +116,44 @@ export async function updateEmployeeQualification(
   const { tenantId, session } = await requirePermission("employees:update");
   const { qualificationId, issuedAt, expiresAt, notes, certificateFile } = data;
 
-  return withTenant(tenantId, async (tx) => {
-    const existing = await tx.employeeQualification.findUnique({
+  const existing = await withTenant(tenantId, async (tx) =>
+    tx.employeeQualification.findUnique({
       where: { id },
       include: { qualification: true },
+    })
+  );
+  if (!existing || existing.tenantId !== tenantId) {
+    return { success: false, error: "Mitarbeiter-Qualifikation nicht gefunden" };
+  }
+
+  const targetQualificationId = qualificationId || existing.qualificationId;
+  const qualification = await withTenant(tenantId, async (tx) =>
+    tx.qualification.findUnique({ where: { id: targetQualificationId, tenantId } })
+  );
+  if (!qualification) {
+    return { success: false, error: "Qualifikation nicht gefunden" };
+  }
+
+  const parsedIssuedAt = parseDate(issuedAt) ?? existing.issuedAt;
+  let parsedExpiresAt = parseDate(expiresAt);
+  if (!parsedExpiresAt && parsedIssuedAt && qualification.validityInMonths) {
+    parsedExpiresAt = addMonths(parsedIssuedAt, qualification.validityInMonths);
+  }
+
+  let certificateFileId = existing.certificateFileId;
+  if (certificateFile && certificateFile.size > 0) {
+    const uploadResult = await uploadFile(certificateFile, {
+      employeeId: existing.employeeId,
+      category: "CERTIFICATE",
+      title: `Zertifikat ${qualification.name}`,
     });
-    if (!existing || existing.tenantId !== tenantId) {
-      return { success: false, error: "Mitarbeiter-Qualifikation nicht gefunden" };
+    if (!uploadResult.success || !uploadResult.fileId) {
+      return { success: false, error: uploadResult.error || "Zertifikat-Upload fehlgeschlagen" };
     }
+    certificateFileId = uploadResult.fileId;
+  }
 
-    const targetQualificationId = qualificationId || existing.qualificationId;
-    const qualification = await tx.qualification.findUnique({
-      where: { id: targetQualificationId, tenantId },
-    });
-    if (!qualification) {
-      return { success: false, error: "Qualifikation nicht gefunden" };
-    }
-
-    const parsedIssuedAt = parseDate(issuedAt) ?? existing.issuedAt;
-    let parsedExpiresAt = parseDate(expiresAt);
-    if (!parsedExpiresAt && parsedIssuedAt && qualification.validityInMonths) {
-      parsedExpiresAt = addMonths(parsedIssuedAt, qualification.validityInMonths);
-    }
-
-    let certificateFileId = existing.certificateFileId;
-    if (certificateFile && certificateFile.size > 0) {
-      const uploadResult = await uploadFile(certificateFile, {
-        employeeId: existing.employeeId,
-        category: "CERTIFICATE",
-        title: `Zertifikat ${qualification.name}`,
-      });
-      if (!uploadResult.success || !uploadResult.fileId) {
-        return { success: false, error: uploadResult.error || "Zertifikat-Upload fehlgeschlagen" };
-      }
-      certificateFileId = uploadResult.fileId;
-    }
-
+  return withTenant(tenantId, async (tx) => {
     const record = await tx.employeeQualification.update({
       where: { id },
       data: {
