@@ -999,11 +999,14 @@ model EmailSetting {
   smtpPort      Int?    @map("smtp_port")
   smtpUser      String? @map("smtp_user")
   smtpPassword  String? @map("smtp_password") // encrypted
+  smtpSecure    Boolean @default(false) @map("smtp_secure")
   imapHost      String? @map("imap_host")
   imapPort      Int?    @map("imap_port")
   imapUser      String? @map("imap_user")
   imapPassword  String? @map("imap_password") // encrypted
+  imapSecure    Boolean @default(true) @map("imap_secure")
   fromAddress   String? @map("from_address")
+  fromName      String? @map("from_name")
   isActive      Boolean @default(false) @map("is_active")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
