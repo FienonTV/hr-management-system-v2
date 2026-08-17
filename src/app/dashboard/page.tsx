@@ -6,8 +6,11 @@ import { getExpiringDocuments } from "@/lib/actions/employeeDocuments";
 import { getExpiringQualifications } from "@/lib/actions/employeeQualifications";
 import { getUpcomingAbsences } from "@/lib/actions/absences";
 import { absenceTypeLabel } from "@/lib/absenceUtils";
+import { getProjects } from "@/lib/actions/projects";
+import { getTimeEntries } from "@/lib/actions/timeTracking";
+import { getWooCommerceOrders } from "@/lib/actions/woocommerce";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, FileText, Award, Clock, Plane } from "lucide-react";
+import { Users, FileText, Award, Clock, Plane, Briefcase, Euro, ShoppingCart } from "lucide-react";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -16,6 +19,9 @@ export default async function DashboardPage() {
   const canReadDocuments = effectivePermissions.has("documents:read");
   const canReadEmployees = effectivePermissions.has("employees:read");
   const canReadAbsences = effectivePermissions.has("absences:read");
+  const canReadProjects = effectivePermissions.has("projects:read");
+  const canReadTimeTracking = effectivePermissions.has("timeTracking:read");
+  const canReadWooCommerce = effectivePermissions.has("woocommerce:read");
 
   let expiringDocs: Awaited<ReturnType<typeof getExpiringDocuments>>["documents"] = [];
   if (canReadDocuments) {
@@ -27,6 +33,22 @@ export default async function DashboardPage() {
 
   const expiringQualifications = canReadEmployees ? await getExpiringQualifications(90) : [];
   const upcomingAbsences = canReadAbsences ? await getUpcomingAbsences() : [];
+  const projects = canReadProjects ? await getProjects() : [];
+  const timeEntries = canReadTimeTracking ? await getTimeEntries() : [];
+  const wooCommerceOrders = canReadWooCommerce ? await getWooCommerceOrders() : [];
+
+  const activeProjects = projects.filter((p) => p.status === "ACTIVE").length;
+  const openMilestones = projects.reduce((sum, p) => sum + p.milestones.filter((m) => m.status === "OPEN").length, 0);
+
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  const thisMonthHours = timeEntries
+    .filter((e) => {
+      const d = new Date(e.date);
+      return d >= monthStart && d <= monthEnd;
+    })
+    .reduce((sum, e) => sum + e.hours.toNumber(), 0);
 
   return (
     <div className="space-y-6">
@@ -78,6 +100,51 @@ export default async function DashboardPage() {
               <CardContent>
                 <p className="text-2xl font-bold text-gray-900">{upcomingAbsences.length}</p>
                 <p className="text-xs text-gray-500">Genehmigte Abwesenheiten in den nächsten 30 Tagen</p>
+              </CardContent>
+            </Card>
+          </Link>
+        )}
+
+        {canReadProjects && (
+          <Link href="/dashboard/modules/projects">
+            <Card className="hover:border-indigo-300 transition-colors">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600">Aktive Projekte</CardTitle>
+                <Briefcase className="h-5 w-5 text-indigo-600" />
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold text-gray-900">{activeProjects}</p>
+                <p className="text-xs text-gray-500">{projects.length} Projekte gesamt · {openMilestones} offene Meilensteine</p>
+              </CardContent>
+            </Card>
+          </Link>
+        )}
+
+        {canReadTimeTracking && (
+          <Link href="/dashboard/modules/time-tracking">
+            <Card className="hover:border-green-300 transition-colors">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600">Zeitbuchungen diesen Monat</CardTitle>
+                <Euro className="h-5 w-5 text-green-600" />
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold text-gray-900">{thisMonthHours.toFixed(1)} h</p>
+                <p className="text-xs text-gray-500">{timeEntries.filter((e) => e.status === "APPROVED").length} freigegebene Einträge</p>
+              </CardContent>
+            </Card>
+          </Link>
+        )}
+
+        {canReadWooCommerce && (
+          <Link href="/dashboard/modules/woocommerce/orders">
+            <Card className="hover:border-purple-300 transition-colors">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600">WooCommerce Bestellungen</CardTitle>
+                <ShoppingCart className="h-5 w-5 text-purple-600" />
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold text-gray-900">{wooCommerceOrders.length}</p>
+                <p className="text-xs text-gray-500">Synchronisierte Bestellungen</p>
               </CardContent>
             </Card>
           </Link>
