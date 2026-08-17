@@ -78,6 +78,7 @@ async function main() {
     { key: 'positions:manage', module: 'employees', resource: 'position', action: 'manage', description: 'Positionen verwalten' },
     { key: 'payGrades:manage', module: 'employees', resource: 'payGrade', action: 'manage', description: 'Entgeltgruppen verwalten' },
     { key: 'customFields:manage', module: 'employees', resource: 'customFieldDefinition', action: 'manage', description: 'Benutzerdefinierte Felder verwalten' },
+    { key: 'qualifications:manage', module: 'employees', resource: 'qualification', action: 'manage', description: 'Qualifikationen verwalten' },
   ];
 
   const permissions = await Promise.all(
@@ -123,6 +124,24 @@ async function main() {
           roleId: adminRole.id,
           permissionId: permission.id,
         },
+      })
+    )
+  );
+
+  // Seed default qualifications
+  const qualificationDefinitions = [
+    { name: 'Führerschein Klasse B', issuer: '', description: 'PKW-Führerschein', validityInMonths: null },
+    { name: 'Staplerschein', issuer: '', description: 'Gabelstapler-Führerschein', validityInMonths: null },
+    { name: 'SCC', issuer: '', description: 'Sicherheitszertifikat für Baustellen', validityInMonths: 36 },
+    { name: 'Erste-Hilfe', issuer: '', description: 'Erste-Hilfe-Ausbildung', validityInMonths: 24 },
+  ];
+
+  await Promise.all(
+    qualificationDefinitions.map((def) =>
+      prisma.qualification.upsert({
+        where: { tenantId_name: { tenantId: tenant.id, name: def.name } },
+        update: {},
+        create: { ...def, tenantId: tenant.id },
       })
     )
   );
