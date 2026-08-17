@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ShieldCheck, FileText, ArrowLeft, Award } from "lucide-react";
+import { ShieldCheck, FileText, ArrowLeft, Award, Plane } from "lucide-react";
 import { getEmployeeById } from "@/lib/actions/employees";
 import { listFiles } from "@/lib/actions/files";
 import { getDepartments, getPositions, getPayGrades } from "@/lib/actions/employeeCatalogs";
@@ -11,10 +11,11 @@ import StammdatenTab from "../StammdatenTab";
 import DocumentsTab from "../DocumentsTab";
 import UserTab from "../UserTab";
 import QualifikationenTab from "../QualifikationenTab";
+import AbwesenheitenTab from "../AbwesenheitenTab";
 import type { Employee, FileItem } from "../types";
 import type { StammdatenTabProps } from "../StammdatenTab";
 
-type Tab = "stammdaten" | "dokumente" | "user" | "qualifikationen";
+type Tab = "stammdaten" | "dokumente" | "user" | "qualifikationen" | "abwesenheiten";
 
 export default function EmployeeEditPage({ params }: { params: Promise<{ id: string }> }) {
   const [employee, setEmployee] = useState<Employee | null>(null);
@@ -81,6 +82,7 @@ export default function EmployeeEditPage({ params }: { params: Promise<{ id: str
   const tabs = [
     { id: "stammdaten" as Tab, label: "Stammdaten", icon: FileText },
     { id: "qualifikationen" as Tab, label: "Qualifikationen", icon: Award },
+    { id: "abwesenheiten" as Tab, label: "Abwesenheiten", icon: Plane },
     { id: "dokumente" as Tab, label: "Dokumente", icon: FileText },
     { id: "user" as Tab, label: "Benutzer-Account", icon: ShieldCheck },
   ];
@@ -132,6 +134,7 @@ export default function EmployeeEditPage({ params }: { params: Promise<{ id: str
         />
       )}
       {activeTab === "qualifikationen" && <QualifikationenTab employeeId={employee.id} />}
+      {activeTab === "abwesenheiten" && <AbwesenheitenTab employeeId={employee.id} />}
       {activeTab === "dokumente" && <DocumentsTab employeeId={employee.id} employee={employee} />}
       {activeTab === "user" && <UserTab employeeId={employee.id} email={employee.email} />}
     </div>
