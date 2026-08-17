@@ -72,8 +72,11 @@ export async function createEmployeeQualification(
       category: "CERTIFICATE",
       title: `Zertifikat ${qualification.name}`,
     });
-    if (!uploadResult.success || !uploadResult.fileId) {
+    if (!uploadResult.success) {
       return { success: false, error: uploadResult.error || "Zertifikat-Upload fehlgeschlagen" };
+    }
+    if (!uploadResult.fileId) {
+      return { success: false, error: "Zertifikat-Upload fehlgeschlagen" };
     }
     certificateFileId = uploadResult.fileId;
   }
@@ -153,8 +156,11 @@ export async function updateEmployeeQualification(
       category: "CERTIFICATE",
       title: `Zertifikat ${qualification.name}`,
     });
-    if (!uploadResult.success || !uploadResult.fileId) {
+    if (!uploadResult.success) {
       return { success: false, error: uploadResult.error || "Zertifikat-Upload fehlgeschlagen" };
+    }
+    if (!uploadResult.fileId) {
+      return { success: false, error: "Zertifikat-Upload fehlgeschlagen" };
     }
     certificateFileId = uploadResult.fileId;
   }
