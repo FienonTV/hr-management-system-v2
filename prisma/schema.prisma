@@ -39,6 +39,8 @@ model Tenant {
   customFieldDefinitions CustomFieldDefinition[]
   qualifications     Qualification[]
   employeeQualifications EmployeeQualification[]
+  calendarEvents     CalendarEvent[]
+  absenceRequests    AbsenceRequest[]
 
   @@map("tenants")
 }
@@ -84,6 +86,8 @@ model User {
   permissions UserPermission[]
   files       File[]
   auditLogs   AuditLog[]
+  requestedAbsences AbsenceRequest[] @relation("RequestedAbsences")
+  approvedAbsences  AbsenceRequest[] @relation("ApprovedAbsences")
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -463,6 +467,8 @@ model Employee {
   position    Position?            @relation(fields: [positionId], references: [id], onDelete: SetNull)
   payGrade    PayGrade?            @relation(fields: [payGradeId], references: [id], onDelete: SetNull)
   qualifications EmployeeQualification[]
+  calendarEvents CalendarEvent[]
+  absenceRequests AbsenceRequest[]
 
   @@unique([tenantId, employeeNumber])
   @@index([tenantId])
@@ -471,6 +477,92 @@ model Employee {
   @@index([tenantId, positionId])
   @@index([tenantId, lastName])
   @@map("employees")
+}
+
+// ------------------------------------------------------------------
+// MODULE: Calendar + Absences
+// ------------------------------------------------------------------
+
+enum CalendarEventType {
+  WORK
+  ABSENCE
+  MEETING
+  HOLIDAY
+
+  @@map("calendar_event_type")
+}
+
+enum AbsenceType {
+  VACATION
+  SICK
+  PARENTAL
+  UNPAID
+  OTHER
+
+  @@map("absence_type")
+}
+
+enum AbsenceStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+
+  @@map("absence_status")
+}
+
+model CalendarEvent {
+  id          String            @id @default(cuid())
+  tenantId    String            @map("tenant_id")
+  title       String
+  startAt     DateTime          @map("start_at")
+  endAt       DateTime          @map("end_at")
+  allDay      Boolean           @default(false) @map("all_day")
+  description String?
+  type        CalendarEventType @default(WORK)
+  employeeId  String?           @map("employee_id")
+  absenceId   String?           @map("absence_id")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  absence  AbsenceRequest? @relation(fields: [absenceId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([tenantId, startAt, endAt])
+  @@index([tenantId, employeeId])
+  @@index([tenantId, type])
+  @@map("calendar_events")
+}
+
+model AbsenceRequest {
+  id            String        @id @default(cuid())
+  tenantId      String        @map("tenant_id")
+  employeeId    String        @map("employee_id")
+  type          AbsenceType
+  startAt       DateTime      @map("start_at")
+  endAt         DateTime      @map("end_at")
+  status        AbsenceStatus @default(PENDING)
+  requestedById String?       @map("requested_by_id")
+  approvedById  String?       @map("approved_by_id")
+  approvedAt    DateTime?     @map("approved_at")
+  notes         String?
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  requestedBy User?  @relation("RequestedAbsences", fields: [requestedById], references: [id], onDelete: SetNull)
+  approvedBy  User?  @relation("ApprovedAbsences", fields: [approvedById], references: [id], onDelete: SetNull)
+  calendarEvents CalendarEvent[]
+
+  @@index([tenantId])
+  @@index([tenantId, employeeId])
+  @@index([tenantId, startAt, endAt])
+  @@index([tenantId, status])
+  @@index([tenantId, type])
+  @@map("absence_requests")
 }
 
 // ------------------------------------------------------------------
