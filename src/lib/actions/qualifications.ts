@@ -31,7 +31,7 @@ export async function createQualification(data: {
   issuer?: string;
   description?: string;
   validityInMonths?: number | null;
-}) {
+}): Promise<{ success: true; qualification: Qualification } | { success: false; error: string }> {
   const { tenantId, session } = await requirePermission("qualifications:manage");
   return withTenant(tenantId, async (tx) => {
     const qualification = await tx.qualification.create({
@@ -59,7 +59,7 @@ export async function updateQualification(
     validityInMonths?: number | null;
     isActive?: boolean;
   }
-) {
+): Promise<{ success: true; qualification: Qualification } | { success: false; error: string }> {
   const { tenantId, session } = await requirePermission("qualifications:manage");
   return withTenant(tenantId, async (tx) => {
     const existing = await tx.qualification.findUnique({ where: { id } });
@@ -80,7 +80,7 @@ export async function updateQualification(
   });
 }
 
-export async function deleteQualification(id: string) {
+export async function deleteQualification(id: string): Promise<{ success: true } | { success: false; error: string }> {
   const { tenantId, session } = await requirePermission("qualifications:manage");
   return withTenant(tenantId, async (tx) => {
     const existing = await tx.qualification.findUnique({

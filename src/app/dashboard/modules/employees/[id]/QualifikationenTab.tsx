@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react";
 import {
   getEmployeeQualifications,
-  getQualifications,
   createEmployeeQualification,
   updateEmployeeQualification,
   deleteEmployeeQualification,
 } from "@/lib/actions/employeeQualifications";
+import { getQualifications } from "@/lib/actions/qualifications";
 import type { EmployeeQualificationRecord } from "@/lib/actions/employeeQualifications";
 import type { Qualification } from "@prisma/client";
 import { Pencil, Trash2, Save, X, Award, AlertTriangle, CheckCircle2, Clock, FileText } from "lucide-react";
