@@ -30,10 +30,10 @@ export default function AbsencesPage() {
     setLoading(true);
     const [reqs, emps] = await Promise.all([
       getAbsenceRequests({}),
-      getEmployees({ limit: 1000 }),
+      getEmployees(),
     ]);
     setRequests(reqs);
-    setEmployees(emps.employees.map((e) => ({
+    setEmployees(emps.map((e) => ({
       id: e.id,
       firstName: e.firstName,
       lastName: e.lastName,

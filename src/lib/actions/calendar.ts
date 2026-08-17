@@ -79,7 +79,7 @@ export async function updateCalendarEvent(
     if (data.allDay !== undefined) update.allDay = data.allDay;
     if (data.description !== undefined) update.description = data.description;
     if (data.type !== undefined) update.type = data.type;
-    if (data.employeeId !== undefined) update.employeeId = data.employeeId ?? null;
+    if (data.employeeId !== undefined) update.employee = data.employeeId ? { connect: { id: data.employeeId } } : { disconnect: true };
 
     const event = await tx.calendarEvent.update({ where: { id }, data: update });
     await logAudit({
