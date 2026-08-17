@@ -45,7 +45,10 @@ export async function createEmployeeQualification(
     notes?: string;
     certificateFile?: File;
   }
-) {
+): Promise<
+  | { success: true; record: EmployeeQualificationRecord }
+  | { success: false; error: string }
+> {
   const { tenantId, session } = await requirePermission("employees:update");
   const { qualificationId, issuedAt, expiresAt, notes, certificateFile } = data;
 
@@ -112,7 +115,10 @@ export async function updateEmployeeQualification(
     notes?: string;
     certificateFile?: File;
   }
-) {
+): Promise<
+  | { success: true; record: EmployeeQualificationRecord }
+  | { success: false; error: string }
+> {
   const { tenantId, session } = await requirePermission("employees:update");
   const { qualificationId, issuedAt, expiresAt, notes, certificateFile } = data;
 
@@ -180,7 +186,9 @@ export async function updateEmployeeQualification(
   });
 }
 
-export async function deleteEmployeeQualification(id: string) {
+export async function deleteEmployeeQualification(
+  id: string
+): Promise<{ success: true } | { success: false; error: string }> {
   const { tenantId, session } = await requirePermission("employees:update");
   return withTenant(tenantId, async (tx) => {
     const existing = await tx.employeeQualification.findUnique({ where: { id } });
