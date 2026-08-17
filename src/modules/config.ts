@@ -120,12 +120,14 @@ export const adminModule: ModuleConfig = {
 export const calendarModule: ModuleConfig = {
   key: "calendar",
   name: "Kalender",
-  description: "Kalender und Abwesenheiten (Phase 4).",
+  description: "Kalender und Abwesenheiten (Phase 2).",
   iconKey: "Calendar",
   isCore: false,
   permissions: [
     { key: "calendar:read", module: "calendar", resource: "calendar", action: "read", description: "Kalender anzeigen" },
     { key: "calendar:create", module: "calendar", resource: "calendar", action: "create", description: "Kalendereinträge erstellen" },
+    { key: "calendar:update", module: "calendar", resource: "calendar", action: "update", description: "Kalendereinträge bearbeiten" },
+    { key: "calendar:delete", module: "calendar", resource: "calendar", action: "delete", description: "Kalendereinträge löschen" },
   ],
   menuItems: [
     { id: "calendar-list", label: "Kalender", path: "/dashboard/modules/calendar", iconKey: "Calendar", requiredPermission: "calendar:read" },
@@ -135,12 +137,14 @@ export const calendarModule: ModuleConfig = {
 export const absencesModule: ModuleConfig = {
   key: "absences",
   name: "Abwesenheiten",
-  description: "Urlaub, Krankmeldungen und Abwesenheitsworkflow (Phase 4).",
+  description: "Urlaub, Krankmeldungen und Abwesenheitsworkflow (Phase 2).",
   iconKey: "Plane",
   isCore: false,
   permissions: [
     { key: "absences:read", module: "absences", resource: "absence", action: "read", description: "Abwesenheiten anzeigen" },
-    { key: "absences:manage", module: "absences", resource: "absence", action: "manage", description: "Abwesenheiten verwalten" },
+    { key: "absences:create", module: "absences", resource: "absence", action: "create", description: "Abwesenheiten beantragen" },
+    { key: "absences:approve", module: "absences", resource: "absence", action: "approve", description: "Abwesenheiten genehmigen" },
+    { key: "absences:delete", module: "absences", resource: "absence", action: "delete", description: "Abwesenheiten löschen" },
   ],
   menuItems: [
     { id: "absences-list", label: "Abwesenheiten", path: "/dashboard/modules/absences", iconKey: "Plane", requiredPermission: "absences:read" },

@@ -79,6 +79,14 @@ async function main() {
     { key: 'payGrades:manage', module: 'employees', resource: 'payGrade', action: 'manage', description: 'Entgeltgruppen verwalten' },
     { key: 'customFields:manage', module: 'employees', resource: 'customFieldDefinition', action: 'manage', description: 'Benutzerdefinierte Felder verwalten' },
     { key: 'qualifications:manage', module: 'employees', resource: 'qualification', action: 'manage', description: 'Qualifikationen verwalten' },
+    { key: 'calendar:read', module: 'calendar', resource: 'calendar', action: 'read', description: 'Kalender anzeigen' },
+    { key: 'calendar:create', module: 'calendar', resource: 'calendar', action: 'create', description: 'Kalendereinträge erstellen' },
+    { key: 'calendar:update', module: 'calendar', resource: 'calendar', action: 'update', description: 'Kalendereinträge bearbeiten' },
+    { key: 'calendar:delete', module: 'calendar', resource: 'calendar', action: 'delete', description: 'Kalendereinträge löschen' },
+    { key: 'absences:read', module: 'absences', resource: 'absence', action: 'read', description: 'Abwesenheiten anzeigen' },
+    { key: 'absences:create', module: 'absences', resource: 'absence', action: 'create', description: 'Abwesenheiten beantragen' },
+    { key: 'absences:approve', module: 'absences', resource: 'absence', action: 'approve', description: 'Abwesenheiten genehmigen' },
+    { key: 'absences:delete', module: 'absences', resource: 'absence', action: 'delete', description: 'Abwesenheiten löschen' },
   ];
 
   const permissions = await Promise.all(
