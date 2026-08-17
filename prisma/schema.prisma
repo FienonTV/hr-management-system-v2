@@ -97,6 +97,7 @@ model User {
   auditLogs   AuditLog[]
   requestedAbsences AbsenceRequest[] @relation("RequestedAbsences")
   approvedAbsences  AbsenceRequest[] @relation("ApprovedAbsences")
+  approvedTimeEntries TimeEntry[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -913,6 +914,7 @@ model TimeEntry {
   tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   project  Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  approvedBy User?  @relation(fields: [approvedById], references: [id], onDelete: SetNull)
 
   @@index([tenantId])
   @@index([tenantId, employeeId])
