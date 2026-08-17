@@ -23,6 +23,7 @@ export async function withTenant<T>(
     // $executeRawUnsafe is used because `SET LOCAL` cannot be executed as a prepared statement.
     const escapedTenantId = tenantId.replace(/'/g, "''");
     await tx.$executeRawUnsafe(`SET LOCAL app.current_tenant = '${escapedTenantId}'`);
+    await tx.$executeRawUnsafe(`SET LOCAL app.current_tenant_id = '${escapedTenantId}'`);
 
     return operation(tx);
   });
