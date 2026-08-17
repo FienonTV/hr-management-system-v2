@@ -5,7 +5,8 @@ import { getEffectivePermissions } from "@/lib/permissions";
 import { getExpiringDocuments } from "@/lib/actions/employeeDocuments";
 import { getExpiringQualifications } from "@/lib/actions/employeeQualifications";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, FileText, Award, Clock } from "lucide-react";
+import { Users, FileText, Award, Clock, Plane } from "lucide-react";
+import { getUpcomingAbsences } from "@/lib/actions/absences";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -13,6 +14,7 @@ export default async function DashboardPage() {
   const effectivePermissions = session && tenantId ? await getEffectivePermissions(session.user.id, tenantId) : new Set<string>();
   const canReadDocuments = effectivePermissions.has("documents:read");
   const canReadEmployees = effectivePermissions.has("employees:read");
+  const canReadAbsences = effectivePermissions.has("absences:read");
 
   let expiringDocs: Awaited<ReturnType<typeof getExpiringDocuments>>["documents"] = [];
   if (canReadDocuments) {
@@ -23,6 +25,7 @@ export default async function DashboardPage() {
   }
 
   const expiringQualifications = canReadEmployees ? await getExpiringQualifications(90) : [];
+  const upcomingAbsences = canReadAbsences ? await getUpcomingAbsences() : [];
 
   return (
     <div className="space-y-6">
@@ -62,18 +65,18 @@ export default async function DashboardPage() {
           </Link>
         )}
 
-        {canReadEmployees && (
-          <Link href="/dashboard/modules/employees">
-            <Card className="hover:border-orange-300 transition-colors">
+        {canReadAbsences && (
+          <Link href="/dashboard/modules/absences">
+            <Card className="hover:border-blue-300 transition-colors">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Ablaufende Qualifikationen</CardTitle>
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-100">
-                  <span className="text-sm font-bold text-orange-700">{expiringQualifications.length}</span>
+                <CardTitle className="text-sm font-medium text-gray-600">Anstehende Abwesenheiten</CardTitle>
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100">
+                  <span className="text-sm font-bold text-blue-700">{upcomingAbsences.length}</span>
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold text-gray-900">{expiringQualifications.length}</p>
-                <p className="text-xs text-gray-500">Qualifikationen laufen in den nächsten 90 Tagen ab</p>
+                <p className="text-2xl font-bold text-gray-900">{upcomingAbsences.length}</p>
+                <p className="text-xs text-gray-500">Genehmigte Abwesenheiten in den nächsten 30 Tagen</p>
               </CardContent>
             </Card>
           </Link>
@@ -128,6 +131,35 @@ export default async function DashboardPage() {
                   </div>
                   <Link
                     href={`/dashboard/modules/employees/${q.employee.id}?tab=qualifikationen`}
+                    className="text-sm font-medium text-primary-600 hover:text-primary-700"
+                  >
+                    Öffnen
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      {canReadAbsences && upcomingAbsences.length > 0 && (
+        <Card>
+          <CardHeader className="flex flex-row items-center gap-2">
+            <Plane className="h-5 w-5 text-blue-600" />
+            <CardTitle className="text-base font-medium text-gray-900">Anstehende Abwesenheiten</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="divide-y divide-gray-100">
+              {upcomingAbsences.map((a) => (
+                <li key={a.id} className="flex items-center justify-between py-3">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{a.employee.firstName} {a.employee.lastName}</p>
+                    <p className="text-xs text-gray-500">
+                      {new Date(a.startAt).toLocaleDateString("de-DE")} – {new Date(a.endAt).toLocaleDateString("de-DE")} · {absenceTypeLabel(a.type)}
+                    </p>
+                  </div>
+                  <Link
+                    href={`/dashboard/modules/employees/${a.employee.id}?tab=abwesenheiten`}
                     className="text-sm font-medium text-primary-600 hover:text-primary-700"
                   >
                     Öffnen

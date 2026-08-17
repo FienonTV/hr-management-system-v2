@@ -315,6 +315,28 @@ export async function cancelAbsenceRequest(
   });
 }
 
+export async function getUpcomingAbsences(days = 30): Promise<AbsenceRequestRecord[]> {
+  const { tenantId } = await requirePermission("absences:read");
+  const now = new Date();
+  const end = new Date();
+  end.setDate(now.getDate() + days);
+  return withTenant(tenantId, async (tx) =>
+    tx.absenceRequest.findMany({
+      where: {
+        status: "APPROVED",
+        startAt: { lte: end },
+        endAt: { gte: now },
+      },
+      include: {
+        employee: { select: { id: true, firstName: true, lastName: true, employeeNumber: true } },
+        requestedBy: { select: { id: true, email: true } },
+        approvedBy: { select: { id: true, email: true } },
+      },
+      orderBy: { startAt: "asc" },
+    })
+  );
+}
+
 export function absenceTypeLabel(type: string) {
   const labels: Record<string, string> = {
     VACATION: "Urlaub",
