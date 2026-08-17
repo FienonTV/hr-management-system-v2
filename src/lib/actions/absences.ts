@@ -4,6 +4,7 @@ import { withTenant } from "@/lib/db/tenant";
 import { requirePermission } from "@/lib/permissions";
 import { revalidatePath } from "next/cache";
 import { logAudit } from "@/lib/audit";
+import { businessDays } from "@/lib/absenceUtils";
 import type { AbsenceRequest, Prisma } from "@prisma/client";
 
 export type AbsenceRequestRecord = AbsenceRequest & {
@@ -337,6 +338,14 @@ export async function getUpcomingAbsences(days = 30): Promise<AbsenceRequestReco
   );
 }
 
+export async function vacationDaysUsedAsync(
+  requests: { startAt: Date; endAt: Date; status: string; type: string }[]
+): Promise<number> {
+  return requests
+    .filter((r) => r.status === "APPROVED" && r.type === "VACATION")
+    .reduce((sum, r) => sum + businessDays(r.startAt, r.endAt), 0);
+}
+
 export function absenceTypeLabel(type: string) {
   const labels: Record<string, string> = {
     VACATION: "Urlaub",
@@ -356,10 +365,4 @@ export function absenceStatusLabel(status: string) {
     CANCELLED: "Storniert",
   };
   return labels[status] || status;
-}
-
-export function vacationDaysUsed(requests: { startAt: Date; endAt: Date; status: string; type: string }[]) {
-  return requests
-    .filter((r) => r.status === "APPROVED" && r.type === "VACATION")
-    .reduce((sum, r) => sum + businessDays(r.startAt, r.endAt), 0);
 }

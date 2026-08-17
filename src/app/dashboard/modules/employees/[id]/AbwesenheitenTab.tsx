@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAbsenceRequests, createAbsenceRequest, approveAbsenceRequest, cancelAbsenceRequest, absenceTypeLabel, absenceStatusLabel } from "@/lib/actions/absences";
+import { getAbsenceRequests, createAbsenceRequest, approveAbsenceRequest, cancelAbsenceRequest } from "@/lib/actions/absences";
+import { absenceTypeLabel, absenceStatusLabel } from "@/lib/absenceUtils";
 import { Plus, Save, X, CheckCircle2, XCircle, Trash2 } from "lucide-react";
 import type { AbsenceRequestRecord } from "@/lib/actions/absences";
 

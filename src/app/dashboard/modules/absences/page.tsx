@@ -6,10 +6,9 @@ import {
   createAbsenceRequest,
   approveAbsenceRequest,
   cancelAbsenceRequest,
-  absenceTypeLabel,
-  absenceStatusLabel,
   type AbsenceRequestRecord,
 } from "@/lib/actions/absences";
+import { absenceTypeLabel, absenceStatusLabel } from "@/lib/absenceUtils";
 import { getEmployees } from "@/lib/actions/employees";
 import { CheckCircle2, XCircle, Trash2, Plus, Save, X } from "lucide-react";
 

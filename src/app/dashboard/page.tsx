@@ -4,9 +4,10 @@ import { getEffectiveTenantId } from "@/lib/session";
 import { getEffectivePermissions } from "@/lib/permissions";
 import { getExpiringDocuments } from "@/lib/actions/employeeDocuments";
 import { getExpiringQualifications } from "@/lib/actions/employeeQualifications";
+import { getUpcomingAbsences } from "@/lib/actions/absences";
+import { absenceTypeLabel } from "@/lib/absenceUtils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, FileText, Award, Clock, Plane } from "lucide-react";
-import { getUpcomingAbsences } from "@/lib/actions/absences";
 
 export default async function DashboardPage() {
   const session = await auth();
