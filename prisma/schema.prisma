@@ -41,6 +41,15 @@ model Tenant {
   employeeQualifications EmployeeQualification[]
   calendarEvents     CalendarEvent[]
   absenceRequests    AbsenceRequest[]
+  projects           Project[]
+  projectEmployees   ProjectEmployee[]
+  projectMilestones  ProjectMilestone[]
+  projectMaterials   ProjectMaterial[]
+  timeEntries        TimeEntry[]
+  payrollExports     PayrollExport[]
+  wooCommerceOrders  WooCommerceOrder[]
+  wooCommerceSettings WooCommerceSetting[]
+  emailSettings      EmailSetting[]
 
   @@map("tenants")
 }
@@ -253,6 +262,9 @@ model File {
   versionOf         File?                   @relation("FileVersions", fields: [versionOfId], references: [id], onDelete: SetNull)
   documentCategories FileDocumentCategory[]
   employeeQualifications EmployeeQualification[]
+  project           Project?                @relation("ProjectFiles", fields: [projectId], references: [id], onDelete: SetNull)
+
+  projectId         String?      @map("project_id")
 
   @@index([tenantId])
   @@index([tenantId, storageKey])
@@ -469,6 +481,8 @@ model Employee {
   qualifications EmployeeQualification[]
   calendarEvents CalendarEvent[]
   absenceRequests AbsenceRequest[]
+  projectEmployees ProjectEmployee[]
+  timeEntries     TimeEntry[]
 
   @@unique([tenantId, employeeNumber])
   @@index([tenantId])
@@ -737,4 +751,263 @@ model CustomFieldDefinition {
   @@unique([tenantId, appliesTo, key])
   @@index([tenantId, appliesTo, isActive])
   @@map("custom_field_definitions")
+}
+
+// ------------------------------------------------------------------
+// MODULE: Projects + Resource Planning
+// ------------------------------------------------------------------
+
+enum ProjectStatus {
+  PLANNED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+
+  @@map("project_status")
+}
+
+enum ProjectMilestoneStatus {
+  OPEN
+  DONE
+
+  @@map("project_milestone_status")
+}
+
+enum ProjectMaterialStatus {
+  ORDERED
+  DELIVERED
+  USED
+
+  @@map("project_material_status")
+}
+
+model Project {
+  id            String        @id @default(cuid())
+  tenantId      String        @map("tenant_id")
+  code          String?
+  name          String
+  description   String?
+  status        ProjectStatus @default(PLANNED)
+  startDate     DateTime?     @map("start_date")
+  endDate       DateTime?     @map("end_date")
+  customerName  String?       @map("customer_name")
+  customerEmail String?       @map("customer_email")
+  address       String?
+  budget        Decimal?      @db.Decimal(12, 2)
+  notes         String?
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  tenant     Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employees  ProjectEmployee[]
+  milestones ProjectMilestone[]
+  materials  ProjectMaterial[]
+  timeEntries TimeEntry[]
+  files      File[]            @relation("ProjectFiles")
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, startDate])
+  @@map("projects")
+}
+
+model ProjectEmployee {
+  id         String     @id @default(cuid())
+  tenantId   String     @map("tenant_id")
+  projectId  String     @map("project_id")
+  employeeId String     @map("employee_id")
+  role       String     @default("Mitarbeiter")
+  startAt    DateTime?  @map("start_at")
+  endAt      DateTime?  @map("end_at")
+  notes      String?
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project  Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, projectId, employeeId])
+  @@index([tenantId, projectId])
+  @@index([tenantId, employeeId])
+  @@map("project_employees")
+}
+
+model ProjectMilestone {
+  id          String                  @id @default(cuid())
+  tenantId    String                  @map("tenant_id")
+  projectId   String                  @map("project_id")
+  title       String
+  plannedDate DateTime?               @map("planned_date")
+  actualDate  DateTime?               @map("actual_date")
+  status      ProjectMilestoneStatus  @default(OPEN)
+  sortOrder   Int                     @default(0) @map("sort_order")
+  createdAt   DateTime                @default(now()) @map("created_at")
+  updatedAt   DateTime                @updatedAt @map("updated_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, projectId])
+  @@index([tenantId, projectId, status])
+  @@map("project_milestones")
+}
+
+model ProjectMaterial {
+  id                 String                @id @default(cuid())
+  tenantId           String                @map("tenant_id")
+  projectId          String                @map("project_id")
+  wooCommerceOrderId String?               @map("woocommerce_order_id")
+  name               String
+  quantity           Decimal?              @db.Decimal(10, 3)
+  unit               String?
+  status             ProjectMaterialStatus @default(ORDERED)
+  notes              String?
+  createdAt          DateTime              @default(now()) @map("created_at")
+  updatedAt          DateTime              @updatedAt @map("updated_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, projectId])
+  @@index([tenantId, wooCommerceOrderId])
+  @@map("project_materials")
+}
+
+// ------------------------------------------------------------------
+// MODULE: Time Tracking
+// ------------------------------------------------------------------
+
+enum TimeEntryType {
+  REGULAR
+  OVERTIME
+  TRAVEL
+  BREAK
+
+  @@map("time_entry_type")
+}
+
+enum TimeEntryStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+
+  @@map("time_entry_status")
+}
+
+model TimeEntry {
+  id          String          @id @default(cuid())
+  tenantId    String          @map("tenant_id")
+  employeeId  String          @map("employee_id")
+  projectId   String?         @map("project_id")
+  date        DateTime
+  hours       Decimal         @db.Decimal(5, 2)
+  description String?
+  type        TimeEntryType   @default(REGULAR)
+  status      TimeEntryStatus @default(DRAFT)
+  approvedById String?        @map("approved_by_id")
+  approvedAt  DateTime?       @map("approved_at")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  project  Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([tenantId, employeeId])
+  @@index([tenantId, projectId])
+  @@index([tenantId, date])
+  @@map("time_entries")
+}
+
+// ------------------------------------------------------------------
+// MODULE: Payroll Export
+// ------------------------------------------------------------------
+
+model PayrollExport {
+  id          String   @id @default(cuid())
+  tenantId    String   @map("tenant_id")
+  year        Int
+  month       Int
+  fileId      String?  @map("file_id")
+  generatedById String? @map("generated_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, year, month])
+  @@map("payroll_exports")
+}
+
+// ------------------------------------------------------------------
+// MODULE: WooCommerce Integration
+// ------------------------------------------------------------------
+
+model WooCommerceSetting {
+  id            String  @id @default(cuid())
+  tenantId      String  @map("tenant_id") @unique
+  storeUrl      String  @map("store_url")
+  consumerKey   String  @map("consumer_key") // encrypted
+  consumerSecret String @map("consumer_secret") // encrypted
+  isActive      Boolean @default(false) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  tenant  Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orders  WooCommerceOrder[]
+
+  @@index([tenantId, isActive])
+  @@map("woocommerce_settings")
+}
+
+model WooCommerceOrder {
+  id            String    @id @default(cuid())
+  tenantId      String    @map("tenant_id")
+  externalOrderId String  @map("external_order_id")
+  orderNumber   String?   @map("order_number")
+  status        String
+  total         Decimal?  @db.Decimal(12, 2)
+  currency      String?
+  customerName  String?   @map("customer_name")
+  customerEmail String?   @map("customer_email")
+  dateCreated   DateTime? @map("date_created")
+  rawData       Json?     @map("raw_data")
+  syncedAt      DateTime  @default(now()) @map("synced_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  tenant   Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  setting  WooCommerceSetting @relation(fields: [tenantId], references: [tenantId], onDelete: Cascade, map: "woocommerce_orders_setting_fkey")
+
+  @@unique([tenantId, externalOrderId])
+  @@index([tenantId, status])
+  @@index([tenantId, dateCreated])
+  @@map("woocommerce_orders")
+}
+
+// ------------------------------------------------------------------
+// MODULE: Email Settings
+// ------------------------------------------------------------------
+
+model EmailSetting {
+  id            String  @id @default(cuid())
+  tenantId      String  @map("tenant_id") @unique
+  smtpHost      String? @map("smtp_host")
+  smtpPort      Int?    @map("smtp_port")
+  smtpUser      String? @map("smtp_user")
+  smtpPassword  String? @map("smtp_password") // encrypted
+  imapHost      String? @map("imap_host")
+  imapPort      Int?    @map("imap_port")
+  imapUser      String? @map("imap_user")
+  imapPassword  String? @map("imap_password") // encrypted
+  fromAddress   String? @map("from_address")
+  isActive      Boolean @default(false) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, isActive])
+  @@map("email_settings")
 }
