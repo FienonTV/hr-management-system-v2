@@ -87,6 +87,18 @@ async function main() {
     { key: 'absences:create', module: 'absences', resource: 'absence', action: 'create', description: 'Abwesenheiten beantragen' },
     { key: 'absences:approve', module: 'absences', resource: 'absence', action: 'approve', description: 'Abwesenheiten genehmigen' },
     { key: 'absences:delete', module: 'absences', resource: 'absence', action: 'delete', description: 'Abwesenheiten löschen' },
+    { key: 'projects:read', module: 'projects', resource: 'project', action: 'read', description: 'Projekte anzeigen' },
+    { key: 'projects:create', module: 'projects', resource: 'project', action: 'create', description: 'Projekte erstellen' },
+    { key: 'projects:update', module: 'projects', resource: 'project', action: 'update', description: 'Projekte bearbeiten' },
+    { key: 'projects:delete', module: 'projects', resource: 'project', action: 'delete', description: 'Projekte löschen' },
+    { key: 'timeTracking:read', module: 'timeTracking', resource: 'timeEntry', action: 'read', description: 'Zeiterfassung anzeigen' },
+    { key: 'timeTracking:create', module: 'timeTracking', resource: 'timeEntry', action: 'create', description: 'Zeiterfassung erfassen' },
+    { key: 'timeTracking:approve', module: 'timeTracking', resource: 'timeEntry', action: 'approve', description: 'Zeiterfassung genehmigen' },
+    { key: 'timeTracking:delete', module: 'timeTracking', resource: 'timeEntry', action: 'delete', description: 'Zeiterfassung löschen' },
+    { key: 'payroll:export', module: 'payroll', resource: 'payroll', action: 'export', description: 'Lohnexport erstellen' },
+    { key: 'woocommerce:read', module: 'woocommerce', resource: 'woocommerceOrder', action: 'read', description: 'WooCommerce-Bestellungen anzeigen' },
+    { key: 'woocommerce:manage', module: 'woocommerce', resource: 'woocommerceSetting', action: 'manage', description: 'WooCommerce-Einstellungen verwalten' },
+    { key: 'email:manage', module: 'email', resource: 'emailSetting', action: 'manage', description: 'E-Mail-Einstellungen verwalten' },
   ];
 
   const permissions = await Promise.all(
