@@ -14,6 +14,7 @@ import {
   Trash2,
   Tag,
   FileStack,
+  Award,
 } from "lucide-react";
 import SidebarClient from "./SidebarClient";
 
@@ -32,6 +33,7 @@ export const ICON_MAP: Record<string, LucideIcon> = {
   Trash2,
   Tag,
   FileStack,
+  Award,
 };
 
 export type SidebarItem = {

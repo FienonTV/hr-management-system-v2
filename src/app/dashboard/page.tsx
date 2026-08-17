@@ -3,14 +3,16 @@ import { auth } from "@/lib/auth";
 import { getEffectiveTenantId } from "@/lib/session";
 import { getEffectivePermissions } from "@/lib/permissions";
 import { getExpiringDocuments } from "@/lib/actions/employeeDocuments";
+import { getExpiringQualifications } from "@/lib/actions/employeeQualifications";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, FileText, AlertTriangle, Clock } from "lucide-react";
+import { Users, FileText, Award, Clock } from "lucide-react";
 
 export default async function DashboardPage() {
   const session = await auth();
   const tenantId = session ? getEffectiveTenantId(session) : "";
   const effectivePermissions = session && tenantId ? await getEffectivePermissions(session.user.id, tenantId) : new Set<string>();
   const canReadDocuments = effectivePermissions.has("documents:read");
+  const canReadEmployees = effectivePermissions.has("employees:read");
 
   let expiringDocs: Awaited<ReturnType<typeof getExpiringDocuments>>["documents"] = [];
   if (canReadDocuments) {
@@ -19,6 +21,8 @@ export default async function DashboardPage() {
       expiringDocs = result.documents;
     }
   }
+
+  const expiringQualifications = canReadEmployees ? await getExpiringQualifications(90) : [];
 
   return (
     <div className="space-y-6">
@@ -57,13 +61,30 @@ export default async function DashboardPage() {
             </Card>
           </Link>
         )}
+
+        {canReadEmployees && (
+          <Link href="/dashboard/modules/employees">
+            <Card className="hover:border-orange-300 transition-colors">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600">Ablaufende Qualifikationen</CardTitle>
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-100">
+                  <span className="text-sm font-bold text-orange-700">{expiringQualifications.length}</span>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold text-gray-900">{expiringQualifications.length}</p>
+                <p className="text-xs text-gray-500">Qualifikationen laufen in den nächsten 90 Tagen ab</p>
+              </CardContent>
+            </Card>
+          </Link>
+        )}
       </div>
 
       {canReadDocuments && expiringDocs.length > 0 && (
         <Card>
           <CardHeader className="flex flex-row items-center gap-2">
             <Clock className="h-5 w-5 text-yellow-600" />
-            <CardTitle className="text-base font-medium text-gray-900">Nächste Abläufe</CardTitle>
+            <CardTitle className="text-base font-medium text-gray-900">Nächste Dokument-Abläufe</CardTitle>
           </CardHeader>
           <CardContent>
             <ul className="divide-y divide-gray-100">
@@ -78,6 +99,35 @@ export default async function DashboardPage() {
                   </div>
                   <Link
                     href={`/dashboard/modules/employees/${doc.employeeId}?tab=dokumente`}
+                    className="text-sm font-medium text-primary-600 hover:text-primary-700"
+                  >
+                    Öffnen
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      {canReadEmployees && expiringQualifications.length > 0 && (
+        <Card>
+          <CardHeader className="flex flex-row items-center gap-2">
+            <Award className="h-5 w-5 text-orange-600" />
+            <CardTitle className="text-base font-medium text-gray-900">Ablaufende Qualifikationen</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="divide-y divide-gray-100">
+              {expiringQualifications.map((q) => (
+                <li key={q.id} className="flex items-center justify-between py-3">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{q.qualification.name}</p>
+                    <p className="text-xs text-gray-500">
+                      {q.employee.firstName} {q.employee.lastName} · Ablauf: {q.expiresAt ? new Date(q.expiresAt).toLocaleDateString("de-DE") : "-"}
+                    </p>
+                  </div>
+                  <Link
+                    href={`/dashboard/modules/employees/${q.employee.id}?tab=qualifikationen`}
                     className="text-sm font-medium text-primary-600 hover:text-primary-700"
                   >
                     Öffnen
