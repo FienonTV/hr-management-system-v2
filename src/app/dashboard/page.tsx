@@ -12,7 +12,9 @@ import { getWooCommerceOrders } from "@/lib/actions/woocommerce";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, FileText, Award, Clock, Plane, Briefcase, Euro, ShoppingCart } from "lucide-react";
 
-export default async function DashboardPage() {
+import ModuleDisabledModal from "./ModuleDisabledModal";
+
+async function DashboardPageContent() {
   const session = await auth();
   const tenantId = session ? getEffectiveTenantId(session) : "";
   const effectivePermissions = session && tenantId ? await getEffectivePermissions(session.user.id, tenantId) : new Set<string>();
@@ -240,5 +242,14 @@ export default async function DashboardPage() {
         </Card>
       )}
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <>
+      <DashboardPageContent />
+      <ModuleDisabledModal />
+    </>
   );
 }
