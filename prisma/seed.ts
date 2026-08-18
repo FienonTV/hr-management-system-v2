@@ -46,6 +46,34 @@ async function main() {
     },
   });
 
+  // Upsert module definitions based on registered modules
+  const moduleDefinitions = [
+    { key: 'employees', name: 'Mitarbeiter', description: 'Verwaltung aller Mitarbeiter-Stammdaten, Dokumente und Qualifikationen.', isCore: true },
+    { key: 'roles', name: 'Rollen', description: 'Rollen und Berechtigungen verwalten.', isCore: true },
+    { key: 'users', name: 'Benutzer', description: 'Benutzer-Accounts und Einladungen verwalten.', isCore: true },
+    { key: 'audit', name: 'Audit-Log', description: 'Sicherheitsrelevante Ereignisse einsehen.', isCore: true },
+    { key: 'files', name: 'Dateien', description: 'Dateien und Dokumente verwalten.', isCore: true },
+    { key: 'admin', name: 'Administration', description: 'Firmen-Einstellungen und Module verwalten.', isCore: true },
+    { key: 'projects', name: 'Projekte', description: 'Projekte und Baustellen verwalten.', isCore: false },
+    { key: 'time-tracking', name: 'Zeiterfassung', description: 'Zeiterfassung für Mitarbeiter.', isCore: false },
+    { key: 'payroll', name: 'Lohnabrechnung', description: 'Lohnabrechnungs-CSV-Export.', isCore: false },
+    { key: 'calendar', name: 'Kalender', description: 'Kalender und Termine.', isCore: false },
+    { key: 'absences', name: 'Abwesenheiten', description: 'Urlaub, Krankmeldungen und Abwesenheitsworkflow.', isCore: false },
+    { key: 'vehicles', name: 'Fahrzeuge', description: 'Fahrzeugverwaltung für Einsatzplanung.', isCore: false },
+    { key: 'planning', name: 'Einsatzplanung', description: 'Tagesplanung für Baustellen, Mitarbeiter und Fahrzeuge.', isCore: false },
+    { key: 'woocommerce', name: 'WooCommerce', description: 'WooCommerce Bestell- und Auftragsimport.', isCore: false },
+  ];
+
+  await Promise.all(
+    moduleDefinitions.map((def) =>
+      prisma.moduleDefinition.upsert({
+        where: { key: def.key },
+        update: {},
+        create: def,
+      })
+    )
+  );
+
   // Upsert default permissions
   const permissionDefinitions = [
     { key: 'employees:read', module: 'employees', resource: 'employee', action: 'read', description: 'Mitarbeiter anzeigen' },
@@ -153,6 +181,24 @@ async function main() {
           tenantId: tenant.id,
           roleId: adminRole.id,
           permissionId: permission.id,
+        },
+      })
+    )
+  );
+
+  // Activate all non-core modules for the default tenant
+  const nonCoreModules = await prisma.moduleDefinition.findMany({ where: { isCore: false } });
+  await Promise.all(
+    nonCoreModules.map((moduleDef) =>
+      prisma.tenantModule.upsert({
+        where: {
+          tenantId_moduleId: { tenantId: tenant.id, moduleId: moduleDef.id },
+        },
+        update: {},
+        create: {
+          tenantId: tenant.id,
+          moduleId: moduleDef.id,
+          isActive: true,
         },
       })
     )

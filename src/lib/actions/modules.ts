@@ -12,7 +12,7 @@ import { revalidatePath } from "next/cache";
 export async function getActiveModuleKeys(tenantId: string): Promise<Set<string>> {
   return withTenant(tenantId, async (tx) => {
     const tenantModules = await tx.tenantModule.findMany({
-      where: { isActive: true },
+      where: { tenantId, isActive: true },
       include: { module: true },
     });
     const keys = new Set(tenantModules.map((tm) => tm.module.key));
