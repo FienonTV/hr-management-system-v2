@@ -50,6 +50,8 @@ model Tenant {
   wooCommerceOrders  WooCommerceOrder[]
   wooCommerceSettings WooCommerceSetting[]
   emailSettings      EmailSetting[]
+  vehicles           Vehicle[]
+  dailyPlans         DailyPlan[]
 
   @@map("tenants")
 }
@@ -98,6 +100,7 @@ model User {
   requestedAbsences AbsenceRequest[] @relation("RequestedAbsences")
   approvedAbsences  AbsenceRequest[] @relation("ApprovedAbsences")
   approvedTimeEntries TimeEntry[]
+  createdDailyPlans DailyPlan[] @relation("DailyPlanCreator")
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -484,6 +487,7 @@ model Employee {
   absenceRequests AbsenceRequest[]
   projectEmployees ProjectEmployee[]
   timeEntries     TimeEntry[]
+  planningAssignments DailyPlanAssignment[]
 
   @@unique([tenantId, employeeNumber])
   @@index([tenantId])
@@ -805,6 +809,7 @@ model Project {
   materials  ProjectMaterial[]
   timeEntries TimeEntry[]
   files      File[]            @relation("ProjectFiles")
+  dailyPlanSites DailyPlanSite[]
 
   @@index([tenantId])
   @@index([tenantId, status])
@@ -1015,4 +1020,101 @@ model EmailSetting {
 
   @@index([tenantId, isActive])
   @@map("email_settings")
+}
+
+// ------------------------------------------------------------------
+// MODULE: Vehicles
+// ------------------------------------------------------------------
+
+enum VehicleStatus {
+  AVAILABLE
+  IN_USE
+  MAINTENANCE
+  OUT_OF_ORDER
+
+  @@map("vehicle_status")
+}
+
+model Vehicle {
+  id          String        @id @default(cuid())
+  tenantId    String        @map("tenant_id")
+  name        String
+  licensePlate String?      @map("license_plate")
+  status      VehicleStatus @default(AVAILABLE)
+  notes       String?
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  tenant      Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assignments DailyPlanAssignment[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("vehicles")
+}
+
+// ------------------------------------------------------------------
+// MODULE: Daily Planning
+// ------------------------------------------------------------------
+
+enum DailyPlanStatus {
+  DRAFT
+  PUBLISHED
+
+  @@map("daily_plan_status")
+}
+
+model DailyPlan {
+  id          String          @id @default(cuid())
+  tenantId    String          @map("tenant_id")
+  date        DateTime        @db.Date
+  status      DailyPlanStatus @default(DRAFT)
+  createdById String?         @map("created_by_id")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  tenant   Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy User?         @relation("DailyPlanCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  sites    DailyPlanSite[]
+
+  @@unique([tenantId, date])
+  @@index([tenantId, date])
+  @@map("daily_plans")
+}
+
+model DailyPlanSite {
+  id        String @id @default(cuid())
+  tenantId  String @map("tenant_id")
+  planId    String @map("plan_id")
+  projectId String @map("project_id")
+  sortOrder Int    @default(0) @map("sort_order")
+  notes     String?
+
+  plan        DailyPlan             @relation(fields: [planId], references: [id], onDelete: Cascade)
+  project     Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignments DailyPlanAssignment[]
+
+  @@index([tenantId, planId])
+  @@index([tenantId, projectId])
+  @@map("daily_plan_sites")
+}
+
+model DailyPlanAssignment {
+  id         String    @id @default(cuid())
+  tenantId   String    @map("tenant_id")
+  siteId     String    @map("site_id")
+  employeeId String?   @map("employee_id")
+  vehicleId  String?   @map("vehicle_id")
+  startAt    DateTime? @map("start_at")
+  endAt      DateTime? @map("end_at")
+  notes      String?
+
+  site     DailyPlanSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  employee Employee?     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  vehicle  Vehicle?      @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, siteId])
+  @@index([tenantId, employeeId])
+  @@index([tenantId, vehicleId])
+  @@map("daily_plan_assignments")
 }

@@ -150,3 +150,38 @@ export const absencesModule: ModuleConfig = {
     { id: "absences-list", label: "Abwesenheiten", path: "/dashboard/modules/absences", iconKey: "Plane", requiredPermission: "absences:read" },
   ],
 };
+
+export const vehiclesModule: ModuleConfig = {
+  key: "vehicles",
+  name: "Fahrzeuge",
+  description: "Fahrzeugverwaltung für Einsatzplanung.",
+  iconKey: "Truck",
+  isCore: false,
+  permissions: [
+    { key: "vehicles:read", module: "vehicles", resource: "vehicle", action: "read", description: "Fahrzeuge anzeigen" },
+    { key: "vehicles:create", module: "vehicles", resource: "vehicle", action: "create", description: "Fahrzeug erstellen" },
+    { key: "vehicles:update", module: "vehicles", resource: "vehicle", action: "update", description: "Fahrzeug bearbeiten" },
+    { key: "vehicles:delete", module: "vehicles", resource: "vehicle", action: "delete", description: "Fahrzeug löschen" },
+  ],
+  menuItems: [
+    { id: "vehicles-list", label: "Fahrzeuge", path: "/dashboard/modules/vehicles", iconKey: "Truck", requiredPermission: "vehicles:read" },
+  ],
+};
+
+export const planningModule: ModuleConfig = {
+  key: "planning",
+  name: "Einsatzplanung",
+  description: "Tagesplanung für Baustellen, Mitarbeiter und Fahrzeuge.",
+  iconKey: "CalendarDays",
+  isCore: false,
+  permissions: [
+    { key: "planning:read", module: "planning", resource: "dailyPlan", action: "read", description: "Einsatzplanung anzeigen" },
+    { key: "planning:create", module: "planning", resource: "dailyPlan", action: "create", description: "Einsatzplanung erstellen" },
+    { key: "planning:update", module: "planning", resource: "dailyPlan", action: "update", description: "Einsatzplanung bearbeiten" },
+    { key: "planning:delete", module: "planning", resource: "dailyPlan", action: "delete", description: "Einsatzplanung löschen" },
+    { key: "planning:export", module: "planning", resource: "dailyPlan", action: "export", description: "Einsatzplanung als PDF exportieren" },
+  ],
+  menuItems: [
+    { id: "planning-today", label: "Einsatzplanung", path: "/dashboard/modules/planning", iconKey: "CalendarDays", requiredPermission: "planning:read" },
+  ],
+};

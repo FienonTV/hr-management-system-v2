@@ -23,20 +23,21 @@ export default async function DashboardPage() {
   const canReadTimeTracking = effectivePermissions.has("timeTracking:read");
   const canReadWooCommerce = effectivePermissions.has("woocommerce:read");
 
-  let expiringDocs: Awaited<ReturnType<typeof getExpiringDocuments>>["documents"] = [];
-  if (canReadDocuments) {
-    const result = await getExpiringDocuments(5);
-    if (result.success) {
-      expiringDocs = result.documents;
-    }
-  }
+  const [documentsResult, qualificationsResult, absencesResult, projectsResult, timeResult, wooResult] = await Promise.all([
+    canReadDocuments ? getExpiringDocuments(5) : Promise.resolve({ success: true, documents: [] }),
+    canReadEmployees ? getExpiringQualifications(90) : Promise.resolve([]),
+    canReadAbsences ? getUpcomingAbsences() : Promise.resolve([]),
+    canReadProjects ? getProjects() : Promise.resolve([]),
+    canReadTimeTracking ? getTimeEntries() : Promise.resolve([]),
+    canReadWooCommerce ? getWooCommerceOrders() : Promise.resolve([]),
+  ]);
 
-  const expiringQualifications = canReadEmployees ? await getExpiringQualifications(90) : [];
-  const upcomingAbsences = canReadAbsences ? await getUpcomingAbsences() : [];
-  const projects = canReadProjects ? await getProjects() : [];
-  const timeEntries = canReadTimeTracking ? await getTimeEntries() : [];
-  const wooCommerceOrders = canReadWooCommerce ? await getWooCommerceOrders() : [];
-
+  const expiringDocs = documentsResult.success ? documentsResult.documents : [];
+  const expiringQualifications = qualificationsResult;
+  const upcomingAbsences = absencesResult;
+  const projects = projectsResult;
+  const timeEntries = timeResult;
+  const wooCommerceOrders = wooResult;
   const activeProjects = projects.filter((p) => p.status === "ACTIVE").length;
   const openMilestones = projects.reduce((sum, p) => sum + p.milestones.filter((m) => m.status === "OPEN").length, 0);
 
