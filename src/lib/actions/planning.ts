@@ -10,14 +10,18 @@ import { getLastWorkingDay, parsePoolDepartments } from "@/lib/planningUtils";
 
 const assignmentSchema = z.object({
   employeeId: z.string().optional(),
-  vehicleId: z.string().optional(),
   startAt: z.string().optional(),
   endAt: z.string().optional(),
   notes: z.string().optional(),
 });
 
 const siteSchema = z.object({
-  projectId: z.string().min(1, "Projekt erforderlich"),
+  projectId: z.string().optional(),
+  name: z.string().optional(),
+  location: z.string().optional(),
+  startTime: z.string().optional(),
+  endTime: z.string().optional(),
+  vehiclePlates: z.array(z.string()).default([]),
   sortOrder: z.number().default(0),
   notes: z.string().optional(),
   assignments: z.array(assignmentSchema).default([]),
@@ -33,10 +37,9 @@ export type DailyPlanInput = z.infer<typeof planInputSchema>;
 
 export type DailyPlanWithSites = DailyPlan & {
   sites: (DailyPlanSite & {
-    project: Project;
+    project: Project | null;
     assignments: (DailyPlanAssignment & {
       employee: Employee | null;
-      vehicle: Vehicle | null;
     })[];
   })[];
 };
@@ -61,7 +64,7 @@ export async function getDailyPlan(dateStr: string): Promise<{
             project: true,
             assignments: {
               orderBy: { id: "asc" },
-              include: { employee: true, vehicle: true },
+              include: { employee: true },
             },
           },
         },
@@ -85,8 +88,8 @@ export async function getDailyPlan(dateStr: string): Promise<{
                 project: true,
                 assignments: {
                   orderBy: { id: "asc" },
-                  include: { employee: true, vehicle: true },
-                },
+                  include: { employee: true },
+                  },
               },
             },
           },
@@ -136,7 +139,12 @@ export async function saveDailyPlan(input: DailyPlanInput): Promise<{ success: t
         data: {
           tenantId,
           planId: plan.id,
-          projectId: siteInput.projectId,
+          projectId: siteInput.projectId || null,
+          name: siteInput.name,
+          location: siteInput.location,
+          startTime: siteInput.startTime,
+          endTime: siteInput.endTime,
+          vehiclePlates: siteInput.vehiclePlates,
           sortOrder: siteInput.sortOrder,
           notes: siteInput.notes,
         },
@@ -151,7 +159,6 @@ export async function saveDailyPlan(input: DailyPlanInput): Promise<{ success: t
             tenantId,
             siteId: site.id,
             employeeId: assignment.employeeId || null,
-            vehicleId: assignment.vehicleId || null,
             startAt: start,
             endAt: end,
             notes: assignment.notes,
@@ -178,7 +185,7 @@ export async function saveDailyPlan(input: DailyPlanInput): Promise<{ success: t
           orderBy: { sortOrder: "asc" },
           include: {
             project: true,
-            assignments: { orderBy: { id: "asc" }, include: { employee: true, vehicle: true } },
+            assignments: { orderBy: { id: "asc" }, include: { employee: true } },
           },
         },
       },

@@ -2,7 +2,6 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { getDailyPlan, getPlanningEmployees, getPlanningSettings, getActiveProjects, type DailyPlanWithSites } from "@/lib/actions/planning";
 import { getAvailableVehicles } from "@/lib/actions/vehicles";
-import { getEmployees } from "@/lib/actions/employees";
 import { getDepartments } from "@/lib/actions/employeeCatalogs";
 import PlanningClient from "./PlanningClient";
 
@@ -21,14 +20,13 @@ export default async function DailyPlanningPage({ params }: { params: Promise<{ 
 
   const { date } = await params;
 
-  const [planResult, employeesRaw, vehiclesRaw, settingsRaw, projectsRaw, departments, allEmployeesRaw] = await Promise.all([
+  const [planResult, employeesRaw, vehiclesRaw, settingsRaw, projectsRaw, departments] = await Promise.all([
     getDailyPlan(date),
     getPlanningEmployees(),
     getAvailableVehicles(),
     getPlanningSettings(),
     getActiveProjects(),
     getDepartments(),
-    getEmployees(),
   ]);
 
   if (!planResult.success) {
@@ -58,7 +56,6 @@ export default async function DailyPlanningPage({ params }: { params: Promise<{ 
   };
 
   const employees = serialize(employeesRaw);
-  const allEmployees = serialize(allEmployeesRaw);
   const vehicles = serialize(vehiclesRaw);
   const projects = serialize(projectsRaw);
 
@@ -70,7 +67,6 @@ export default async function DailyPlanningPage({ params }: { params: Promise<{ 
       isHoliday={planResult.isHoliday}
       holidayName={planResult.holidayName}
       employees={employees}
-      allEmployees={allEmployees}
       vehicles={vehicles}
       settings={typedSettings}
       projects={projects}

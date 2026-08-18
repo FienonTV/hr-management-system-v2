@@ -1046,7 +1046,6 @@ model Vehicle {
   updatedAt   DateTime      @updatedAt @map("updated_at")
 
   tenant      Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  assignments DailyPlanAssignment[]
 
   @@index([tenantId])
   @@index([tenantId, status])
@@ -1074,7 +1073,7 @@ model DailyPlan {
   updatedAt   DateTime        @updatedAt @map("updated_at")
 
   tenant   Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  createdBy User?         @relation("DailyPlanCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdBy User?           @relation("DailyPlanCreator", fields: [createdById], references: [id], onDelete: SetNull)
   sites    DailyPlanSite[]
 
   @@unique([tenantId, date])
@@ -1083,15 +1082,20 @@ model DailyPlan {
 }
 
 model DailyPlanSite {
-  id        String @id @default(cuid())
-  tenantId  String @map("tenant_id")
-  planId    String @map("plan_id")
-  projectId String @map("project_id")
-  sortOrder Int    @default(0) @map("sort_order")
-  notes     String?
+  id            String   @id @default(cuid())
+  tenantId      String   @map("tenant_id")
+  planId        String   @map("plan_id")
+  projectId     String?  @map("project_id")
+  name          String?
+  location      String?
+  startTime     String?  @map("start_time") // HH:MM
+  endTime       String?  @map("end_time")   // HH:MM
+  vehiclePlates String[] @map("vehicle_plates") // PostgreSQL text[]
+  sortOrder     Int      @default(0) @map("sort_order")
+  notes         String?
 
   plan        DailyPlan             @relation(fields: [planId], references: [id], onDelete: Cascade)
-  project     Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project     Project?              @relation(fields: [projectId], references: [id], onDelete: SetNull)
   assignments DailyPlanAssignment[]
 
   @@index([tenantId, planId])
@@ -1104,17 +1108,14 @@ model DailyPlanAssignment {
   tenantId   String    @map("tenant_id")
   siteId     String    @map("site_id")
   employeeId String?   @map("employee_id")
-  vehicleId  String?   @map("vehicle_id")
   startAt    DateTime? @map("start_at")
   endAt      DateTime? @map("end_at")
   notes      String?
 
   site     DailyPlanSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
   employee Employee?     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  vehicle  Vehicle?      @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, siteId])
   @@index([tenantId, employeeId])
-  @@index([tenantId, vehicleId])
   @@map("daily_plan_assignments")
 }

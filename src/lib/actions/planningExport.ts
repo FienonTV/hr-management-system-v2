@@ -16,7 +16,7 @@ export async function exportPlanningPdf(dateStr: string): Promise<{ success: tru
           orderBy: { sortOrder: "asc" },
           include: {
             project: true,
-            assignments: { include: { employee: true, vehicle: true } },
+            assignments: { include: { employee: true } },
           },
         },
       },
@@ -36,10 +36,10 @@ export async function exportPlanningPdf(dateStr: string): Promise<{ success: tru
             const end = a.endAt ? `${pad(a.endAt.getHours())}:${pad(a.endAt.getMinutes())}` : "";
             return `
               <tr>
-                <td>${site.project.name}</td>
+                <td>${site.name || site.project?.name || "Baustelle"}</td>
                 <td>${a.employee ? `${a.employee.lastName}, ${a.employee.firstName}` : "-"}</td>
-                <td>${start}${end ? ` – ${end}` : ""}</td>
-                <td>${a.vehicle ? `${a.vehicle.name} ${a.vehicle.licensePlate || ""}` : "-"}</td>
+                <td>${site.startTime || (start ? start : "-")}${site.endTime ? `–${site.endTime}` : (end ? ` – ${end}` : "")}</td>
+                <td>${site.vehiclePlates.join(", ") || "-"}</td>
                 <td>${site.notes || a.notes || ""}</td>
               </tr>
             `;
