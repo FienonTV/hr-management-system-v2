@@ -2,8 +2,10 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import EmployeesClient, { type EmployeeWithRelations } from "./EmployeesClient";
+import { guardModule } from "@/lib/actions/moduleGuard";
 
 export default async function EmployeesPage() {
+  await guardModule("employees");
   const session = await auth();
   if (!session?.user) redirect("/login");
 

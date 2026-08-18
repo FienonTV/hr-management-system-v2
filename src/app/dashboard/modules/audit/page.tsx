@@ -2,6 +2,7 @@ import { getAuditLogs, getDistinctAuditActions, getDistinctAuditResourceTypes } 
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { ClipboardList, User, Shield, Users, Briefcase, ChevronLeft, ChevronRight } from "lucide-react";
+import { guardModule } from "@/lib/actions/moduleGuard";
 
 const PAGE_SIZE = 50;
 
@@ -49,6 +50,7 @@ export default async function AuditLogPage({
 }: {
   searchParams: Promise<{ action?: string; resourceType?: string; userId?: string; from?: string; to?: string; page?: string }>;
 }) {
+  await guardModule("audit");
   const session = await auth();
   if (!session?.user) redirect("/login");
 

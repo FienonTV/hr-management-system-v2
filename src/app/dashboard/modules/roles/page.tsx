@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { Shield, Plus, Edit, Trash2, CheckCircle2, XCircle } from "lucide-react";
 import { revalidatePath } from "next/cache";
 import type { Permission } from "@prisma/client";
+import { guardModule } from "@/lib/actions/moduleGuard";
 
 function groupPermissionsByModule(permissions: Permission[]) {
   const map = new Map<string, Permission[]>();
@@ -17,6 +18,7 @@ function groupPermissionsByModule(permissions: Permission[]) {
 }
 
 export default async function RolesPage() {
+  await guardModule("roles");
   const session = await auth();
   if (!session?.user) redirect("/login");
 

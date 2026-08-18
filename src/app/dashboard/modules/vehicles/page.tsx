@@ -2,8 +2,10 @@ import { getVehicles } from "@/lib/actions/vehicles";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import VehiclesClient from "./VehiclesClient";
+import { guardModule } from "@/lib/actions/moduleGuard";
 
 export default async function VehiclesPage() {
+  await guardModule("vehicles");
   const session = await auth();
   if (!session?.user) redirect("/login");
 

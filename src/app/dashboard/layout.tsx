@@ -1,5 +1,4 @@
-﻿import { cookies } from "next/headers";
-import { auth } from "@/lib/auth";
+﻿import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { SessionProvider } from "next-auth/react";
 import Sidebar from "@/components/layout/Sidebar";
@@ -26,14 +25,6 @@ export default async function DashboardLayout({
   ]);
 
   const visibleItems = buildSidebarItems(activeModuleKeys, effectivePermissions);
-
-  // Set active module keys cookie for middleware gating.
-  const cookieStore = await cookies();
-  cookieStore.set("activeModules", JSON.stringify(Array.from(activeModuleKeys)), {
-    path: "/",
-    maxAge: 86400,
-    sameSite: "lax",
-  });
 
   return (
     <SessionProvider session={session}>

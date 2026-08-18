@@ -3,8 +3,10 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { getCalendarAggregatedEvents, getCalendarEmployees, type AggregatedCalendarEvent } from "@/lib/actions/calendarAggregated";
 import CalendarClient from "./CalendarClient";
+import { guardModule } from "@/lib/actions/moduleGuard";
 
 export default async function CalendarPage() {
+  await guardModule("calendar");
   const session = await auth();
   if (!session?.user) redirect("/login");
 

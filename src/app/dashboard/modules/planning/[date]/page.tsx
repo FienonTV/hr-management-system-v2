@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { guardModule } from "@/lib/actions/moduleGuard";
 import { getDailyPlan, getPlanningEmployees, getPlanningSettings, getActiveProjects, type DailyPlanWithSites } from "@/lib/actions/planning";
 import { getAvailableVehicles } from "@/lib/actions/vehicles";
 import { getDepartments } from "@/lib/actions/employeeCatalogs";
@@ -15,6 +16,7 @@ function serializePlan(plan: DailyPlanWithSites | null): DailyPlanWithSites | nu
 }
 
 export default async function DailyPlanningPage({ params }: { params: Promise<{ date: string }> }) {
+  await guardModule("planning");
   const session = await auth();
   if (!session?.user) redirect("/login");
 

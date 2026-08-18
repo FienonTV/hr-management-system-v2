@@ -118,3 +118,16 @@ export async function requireModuleActive(moduleKey: string): Promise<void> {
     throw new Error("Modul ist für diese Firma nicht aktiviert");
   }
 }
+
+export async function checkModuleAccess(moduleKey: string): Promise<{ active: boolean; redirectUrl: string | null }> {
+  const session = await auth();
+  if (!session?.user) {
+    return { active: false, redirectUrl: "/login" };
+  }
+  const tenantId = getEffectiveTenantId(session);
+  const activeKeys = await getActiveModuleKeys(tenantId);
+  if (!activeKeys.has(moduleKey)) {
+    return { active: false, redirectUrl: "/dashboard?moduleDisabled=true" };
+  }
+  return { active: true, redirectUrl: null };
+}
