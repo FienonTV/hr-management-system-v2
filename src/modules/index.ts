@@ -1,4 +1,4 @@
-import { employeesModule, rolesModule, usersModule, auditModule, filesModule, adminModule, projectsModule, timeTrackingModule, payrollModule, woocommerceModule, calendarModule, absencesModule, vehiclesModule, planningModule } from "./config";
+import { employeesModule, rolesModule, usersModule, auditModule, filesModule, adminModule, settingsModule, projectsModule, timeTrackingModule, payrollModule, woocommerceModule, calendarModule, absencesModule, vehiclesModule, planningModule } from "./config";
 import type { ModuleConfig, ResolvedSidebarItem } from "./types";
 
 // Central module registry. Every module that should be available to the
@@ -13,6 +13,7 @@ export const registeredModules: ModuleConfig[] = [
   payrollModule,
   filesModule,
   adminModule,
+  settingsModule,
   auditModule,
   calendarModule,
   absencesModule,

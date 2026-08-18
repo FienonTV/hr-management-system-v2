@@ -153,18 +153,25 @@ export const payrollModule: ModuleConfig = {
 export const adminModule: ModuleConfig = {
   key: "admin",
   name: "Administration",
-  description: "Firmen-Einstellungen und Module verwalten.",
+  description: "Berechtigungen für Admin-Funktionen.",
   iconKey: "Settings",
   isCore: true,
   permissions: [
     { key: "tenant:manage", module: "admin", resource: "tenant", action: "manage", description: "Firmen-Einstellungen verwalten" },
     { key: "modules:manage", module: "admin", resource: "module", action: "manage", description: "Module aktivieren/deaktivieren" },
   ],
+  menuItems: [],
+};
+
+export const settingsModule: ModuleConfig = {
+  key: "settings",
+  name: "Einstellungen",
+  description: "Zentrale Einstellungen-Übersicht.",
+  iconKey: "Settings",
+  isCore: true,
+  permissions: [],
   menuItems: [
-    { id: "admin-settings", label: "Firmen-Einstellungen", path: "/dashboard/modules/admin/settings", iconKey: "Building2", requiredPermission: "tenant:manage" },
-    { id: "admin-modules", label: "Module", path: "/dashboard/modules/admin/modules", iconKey: "Layers", requiredPermission: "modules:manage" },
-    { id: "admin-email", label: "E-Mail-Einstellungen", path: "/dashboard/modules/admin/email", iconKey: "Mail", requiredPermission: "tenant:manage" },
-    { id: "admin-woocommerce", label: "WooCommerce", path: "/dashboard/modules/admin/woocommerce", iconKey: "ShoppingCart", requiredPermission: "tenant:manage" },
+    { id: "settings-index", label: "Einstellungen", path: "/dashboard/modules/settings", iconKey: "Settings" },
   ],
 };
 
