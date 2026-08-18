@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { decode } from "next-auth/jwt";
 
 // Paths that are always allowed regardless of module activation.
 const ALWAYS_ALLOWED_PATHS = new Set([

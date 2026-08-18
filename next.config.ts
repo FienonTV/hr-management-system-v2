@@ -26,9 +26,6 @@ const nextConfig: NextConfig = {
       bodySizeLimit: 10 * 1024 * 1024,
     },
   },
-  serverActions: {
-    bodySizeLimit: 10 * 1024 * 1024,
-  },
   serverExternalPackages: ["pg", "pg-pool", "@prisma/adapter-pg", "bcryptjs", "puppeteer"],
   eslint: {
     ignoreDuringBuilds: true,
