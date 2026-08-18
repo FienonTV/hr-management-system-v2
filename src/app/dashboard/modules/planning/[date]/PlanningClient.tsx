@@ -15,7 +15,10 @@ import { exportPlanningPdf } from "@/lib/actions/planningExport";
 import type { DailyPlanWithSites } from "@/lib/actions/planning";
 import type { Employee, Vehicle, Project, Department } from "@prisma/client";
 
-type PlanningEmployee = Employee & { department: Department | null };
+type PlanningEmployee = Omit<Employee, "hourlyWage"> & {
+  hourlyWage?: number | null;
+  department: { id: string; name: string } | null;
+};
 
 type PlanningSite = {
   id?: string;
@@ -53,7 +56,7 @@ export default function PlanningClient({
   isHoliday: boolean;
   holidayName: string | null;
   employees: PlanningEmployee[];
-  allEmployees: Employee[];
+  allEmployees: (Omit<Employee, "hourlyWage"> & { hourlyWage?: number | null })[];
   vehicles: Vehicle[];
   settings: {
     defaultStartTime: string;
@@ -330,66 +333,75 @@ export default function PlanningClient({
                   <Input value={site.notes} onChange={(e) => updateSite(siteIdx, "notes", e.target.value)} />
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <p className="text-sm font-medium text-gray-700">Mitarbeiter / Fahrzeuge</p>
                   {site.assignments.map((assignment, assignmentIdx) => (
-                    <div key={assignmentIdx} className="grid grid-cols-12 gap-2 rounded-lg border p-2">
-                      <div className="col-span-3">
-                        <select
-                          className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
-                          value={assignment.employeeId || ""}
-                          onChange={(e) => updateAssignment(siteIdx, assignmentIdx, "employeeId", e.target.value)}
-                        >
-                          <option value="">Mitarbeiter wählen</option>
-                          {employees.map((e) => (
-                            <option key={e.id} value={e.id}>
-                              {e.lastName}, {e.firstName}
-                            </option>
-                          ))}
-                        </select>
-                        {assignment.employeeId && pendingAbsences[assignment.employeeId] && (
-                          <p className="mt-1 text-xs text-red-600">{pendingAbsences[assignment.employeeId]}</p>
-                        )}
-                      </div>
-                      <div className="col-span-2">
-                        <input
-                          type="time"
-                          className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
-                          value={assignment.startAt || settings.defaultStartTime}
-                          onChange={(e) => updateAssignment(siteIdx, assignmentIdx, "startAt", e.target.value)}
-                        />
-                      </div>
-                      <div className="col-span-2">
-                        <input
-                          type="time"
-                          className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
-                          value={assignment.endAt || settings.defaultEndTime}
-                          onChange={(e) => updateAssignment(siteIdx, assignmentIdx, "endAt", e.target.value)}
-                        />
-                      </div>
-                      <div className="col-span-3">
-                        <select
-                          className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
-                          value={assignment.vehicleId || ""}
-                          onChange={(e) => updateAssignment(siteIdx, assignmentIdx, "vehicleId", e.target.value)}
-                        >
-                          <option value="">Fahrzeug wählen</option>
-                          {vehicles.map((v) => (
-                            <option key={v.id} value={v.id}>
-                              {v.name} {v.licensePlate ? `(${v.licensePlate})` : ""}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="col-span-1">
-                        <Button variant="outline" className="px-2" onClick={() => removeAssignment(siteIdx, assignmentIdx)}>
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
+                    <div key={assignmentIdx} className="rounded-lg border bg-white p-3 shadow-sm">
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
+                        <div className="md:col-span-4">
+                          <Label className="text-xs text-gray-500">Mitarbeiter</Label>
+                          <select
+                            className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm"
+                            value={assignment.employeeId || ""}
+                            onChange={(e) => updateAssignment(siteIdx, assignmentIdx, "employeeId", e.target.value)}
+                          >
+                            <option value="">Mitarbeiter wählen</option>
+                            {employees.map((e) => (
+                              <option key={e.id} value={e.id}>
+                                {e.lastName}, {e.firstName}
+                              </option>
+                            ))}
+                          </select>
+                          {assignment.employeeId && pendingAbsences[assignment.employeeId] && (
+                            <p className="mt-1 text-xs text-red-600">{pendingAbsences[assignment.employeeId]}</p>
+                          )}
+                        </div>
+
+                        <div className="md:col-span-3">
+                          <Label className="text-xs text-gray-500">Zeit</Label>
+                          <div className="mt-1 flex items-center gap-2">
+                            <input
+                              type="time"
+                              className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+                              value={assignment.startAt || settings.defaultStartTime}
+                              onChange={(e) => updateAssignment(siteIdx, assignmentIdx, "startAt", e.target.value)}
+                            />
+                            <span className="text-gray-400">–</span>
+                            <input
+                              type="time"
+                              className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+                              value={assignment.endAt || settings.defaultEndTime}
+                              onChange={(e) => updateAssignment(siteIdx, assignmentIdx, "endAt", e.target.value)}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="md:col-span-4">
+                          <Label className="text-xs text-gray-500">Fahrzeug (optional)</Label>
+                          <select
+                            className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm"
+                            value={assignment.vehicleId || ""}
+                            onChange={(e) => updateAssignment(siteIdx, assignmentIdx, "vehicleId", e.target.value)}
+                          >
+                            <option value="">Fahrzeug wählen</option>
+                            {vehicles.map((v) => (
+                              <option key={v.id} value={v.id}>
+                                {v.name} {v.licensePlate ? `(${v.licensePlate})` : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="md:col-span-1 flex items-end">
+                          <Button variant="outline" className="w-full px-2" onClick={() => removeAssignment(siteIdx, assignmentIdx)}>
+                            <Trash2 className="mx-auto h-4 w-4 text-red-500" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ))}
-                  <Button variant="outline" className="px-2 py-1 text-sm" onClick={() => addAssignment(siteIdx)}>
-                    <Plus className="mr-1 h-4 w-4" /> Zuordnung
+                  <Button variant="outline" className="px-3 py-1.5 text-sm" onClick={() => addAssignment(siteIdx)}>
+                    <Plus className="mr-1 h-4 w-4" /> Zuordnung hinzufügen
                   </Button>
                 </div>
               </CardContent>

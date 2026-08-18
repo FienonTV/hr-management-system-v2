@@ -208,7 +208,7 @@ export async function deleteDailyPlan(dateStr: string): Promise<{ success: true 
   });
 }
 
-export async function getPlanningEmployees(): Promise<(Employee & { department: { name: string } | null })[]> {
+export async function getPlanningEmployees(): Promise<(Omit<Employee, "hourlyWage"> & { hourlyWage?: number | null; department: { id: string; name: string } | null })[]> {
   const { tenantId } = await requirePermission("planning:read");
   return withTenant(tenantId, async (tx) => {
     const poolDepartmentsRaw = await getTenantSetting(tx as any, tenantId, "planning_pool_departments", "");
@@ -217,11 +217,15 @@ export async function getPlanningEmployees(): Promise<(Employee & { department: 
     if (poolDepartmentIds.length > 0) {
       where.departmentId = { in: poolDepartmentIds };
     }
-    return tx.employee.findMany({
+    const employees = await tx.employee.findMany({
       where,
       include: { department: { select: { id: true, name: true } } },
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     });
+    return employees.map((e) => ({
+      ...e,
+      hourlyWage: e.hourlyWage ? Number(e.hourlyWage) : null,
+    }));
   });
 }
 

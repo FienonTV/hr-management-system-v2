@@ -1,10 +1,19 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { getDailyPlan, getPlanningEmployees, getPlanningSettings, getActiveProjects } from "@/lib/actions/planning";
+import { getDailyPlan, getPlanningEmployees, getPlanningSettings, getActiveProjects, type DailyPlanWithSites } from "@/lib/actions/planning";
 import { getAvailableVehicles } from "@/lib/actions/vehicles";
 import { getEmployees } from "@/lib/actions/employees";
 import { getDepartments } from "@/lib/actions/employeeCatalogs";
 import PlanningClient from "./PlanningClient";
+
+function serialize<T>(list: T[]): T[] {
+  return JSON.parse(JSON.stringify(list)) as T[];
+}
+
+function serializePlan(plan: DailyPlanWithSites | null): DailyPlanWithSites | null {
+  if (!plan) return null;
+  return JSON.parse(JSON.stringify(plan));
+}
 
 export default async function DailyPlanningPage({ params }: { params: Promise<{ date: string }> }) {
   const session = await auth();
@@ -12,7 +21,7 @@ export default async function DailyPlanningPage({ params }: { params: Promise<{ 
 
   const { date } = await params;
 
-  const [planResult, employees, vehicles, settings, projects, departments, allEmployees] = await Promise.all([
+  const [planResult, employeesRaw, vehiclesRaw, settingsRaw, projectsRaw, departments, allEmployeesRaw] = await Promise.all([
     getDailyPlan(date),
     getPlanningEmployees(),
     getAvailableVehicles(),
@@ -30,7 +39,9 @@ export default async function DailyPlanningPage({ params }: { params: Promise<{ 
     );
   }
 
-  if (!settings || ("success" in settings && settings.success === false)) {
+  const settings = settingsRaw && !("success" in settingsRaw && settingsRaw.success === false) ? settingsRaw : null;
+
+  if (!settings) {
     return (
       <div className="p-4 text-red-600">
         Fehler beim Laden der Planungseinstellungen.
@@ -38,17 +49,30 @@ export default async function DailyPlanningPage({ params }: { params: Promise<{ 
     );
   }
 
+  const typedSettings = settings as {
+    defaultStartTime: string;
+    defaultEndTime: string;
+    autoCarryOver: boolean;
+    weekendMode: "none" | "saturday" | "both";
+    poolDepartmentIds: string[];
+  };
+
+  const employees = serialize(employeesRaw);
+  const allEmployees = serialize(allEmployeesRaw);
+  const vehicles = serialize(vehiclesRaw);
+  const projects = serialize(projectsRaw);
+
   return (
     <PlanningClient
       date={date}
-      initialPlan={planResult.plan}
+      initialPlan={serializePlan(planResult.plan)}
       isTemplate={planResult.isTemplate}
       isHoliday={planResult.isHoliday}
       holidayName={planResult.holidayName}
-      employees={employees as any}
-      allEmployees={allEmployees as any}
+      employees={employees}
+      allEmployees={allEmployees}
       vehicles={vehicles}
-      settings={settings as any}
+      settings={typedSettings}
       projects={projects}
       departments={departments}
     />
