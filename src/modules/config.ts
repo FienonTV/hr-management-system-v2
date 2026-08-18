@@ -101,6 +101,55 @@ export const filesModule: ModuleConfig = {
   ],
 };
 
+export const projectsModule: ModuleConfig = {
+  key: "projects",
+  name: "Projekte",
+  description: "Projekte und Baustellen verwalten.",
+  iconKey: "Layers",
+  isCore: false,
+  permissions: [
+    { key: "projects:read", module: "projects", resource: "project", action: "read", description: "Projekte anzeigen" },
+    { key: "projects:create", module: "projects", resource: "project", action: "create", description: "Projekt erstellen" },
+    { key: "projects:update", module: "projects", resource: "project", action: "update", description: "Projekt bearbeiten" },
+    { key: "projects:delete", module: "projects", resource: "project", action: "delete", description: "Projekt löschen" },
+  ],
+  menuItems: [
+    { id: "projects-list", label: "Projekte", path: "/dashboard/modules/projects", iconKey: "Layers", requiredPermission: "projects:read" },
+  ],
+};
+
+export const timeTrackingModule: ModuleConfig = {
+  key: "time-tracking",
+  name: "Zeiterfassung",
+  description: "Zeiterfassung für Mitarbeiter.",
+  iconKey: "Clock",
+  isCore: false,
+  permissions: [
+    { key: "timeTracking:read", module: "time-tracking", resource: "timeEntry", action: "read", description: "Zeiterfassung anzeigen" },
+    { key: "timeTracking:create", module: "time-tracking", resource: "timeEntry", action: "create", description: "Zeiterfassung erstellen" },
+    { key: "timeTracking:approve", module: "time-tracking", resource: "timeEntry", action: "approve", description: "Zeiterfassung freigeben" },
+    { key: "timeTracking:export", module: "time-tracking", resource: "timeEntry", action: "export", description: "Zeiterfassung exportieren" },
+  ],
+  menuItems: [
+    { id: "time-tracking-list", label: "Zeiterfassung", path: "/dashboard/modules/time-tracking", iconKey: "Clock", requiredPermission: "timeTracking:read" },
+  ],
+};
+
+export const payrollModule: ModuleConfig = {
+  key: "payroll",
+  name: "Lohnabrechnung",
+  description: "Lohnabrechnungs-CSV-Export.",
+  iconKey: "FileSpreadsheet",
+  isCore: false,
+  permissions: [
+    { key: "payroll:read", module: "payroll", resource: "payrollExport", action: "read", description: "Lohnabrechnung anzeigen" },
+    { key: "payroll:export", module: "payroll", resource: "payrollExport", action: "export", description: "Lohnabrechnung exportieren" },
+  ],
+  menuItems: [
+    { id: "payroll-list", label: "Lohnabrechnung", path: "/dashboard/modules/payroll", iconKey: "FileSpreadsheet", requiredPermission: "payroll:read" },
+  ],
+};
+
 export const adminModule: ModuleConfig = {
   key: "admin",
   name: "Administration",
@@ -114,6 +163,23 @@ export const adminModule: ModuleConfig = {
   menuItems: [
     { id: "admin-settings", label: "Firmen-Einstellungen", path: "/dashboard/modules/admin/settings", iconKey: "Building2", requiredPermission: "tenant:manage" },
     { id: "admin-modules", label: "Module", path: "/dashboard/modules/admin/modules", iconKey: "Layers", requiredPermission: "modules:manage" },
+    { id: "admin-email", label: "E-Mail-Einstellungen", path: "/dashboard/modules/admin/email", iconKey: "Mail", requiredPermission: "tenant:manage" },
+    { id: "admin-woocommerce", label: "WooCommerce", path: "/dashboard/modules/admin/woocommerce", iconKey: "ShoppingCart", requiredPermission: "tenant:manage" },
+  ],
+};
+
+export const woocommerceModule: ModuleConfig = {
+  key: "woocommerce",
+  name: "WooCommerce",
+  description: "WooCommerce Bestell- und Auftragsimport.",
+  iconKey: "ShoppingCart",
+  isCore: false,
+  permissions: [
+    { key: "woocommerce:read", module: "woocommerce", resource: "order", action: "read", description: "Bestellungen anzeigen" },
+    { key: "woocommerce:sync", module: "woocommerce", resource: "order", action: "sync", description: "Bestellungen synchronisieren" },
+  ],
+  menuItems: [
+    { id: "woocommerce-orders", label: "Bestellungen", path: "/dashboard/modules/woocommerce/orders", iconKey: "ShoppingCart", requiredPermission: "woocommerce:read" },
   ],
 };
 

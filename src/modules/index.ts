@@ -1,4 +1,4 @@
-import { employeesModule, rolesModule, usersModule, auditModule, filesModule, adminModule, calendarModule, absencesModule, vehiclesModule, planningModule } from "./config";
+import { employeesModule, rolesModule, usersModule, auditModule, filesModule, adminModule, projectsModule, timeTrackingModule, payrollModule, woocommerceModule, calendarModule, absencesModule, vehiclesModule, planningModule } from "./config";
 import type { ModuleConfig, ResolvedSidebarItem } from "./types";
 
 // Central module registry. Every module that should be available to the
@@ -8,6 +8,9 @@ export const registeredModules: ModuleConfig[] = [
   employeesModule,
   rolesModule,
   usersModule,
+  projectsModule,
+  timeTrackingModule,
+  payrollModule,
   filesModule,
   adminModule,
   auditModule,
@@ -15,6 +18,7 @@ export const registeredModules: ModuleConfig[] = [
   absencesModule,
   vehiclesModule,
   planningModule,
+  woocommerceModule,
 ];
 
 // Core modules are always considered active, even when not present in

@@ -17,6 +17,10 @@ import {
   FileStack,
   Award,
   Truck,
+  Clock,
+  FileSpreadsheet,
+  Mail,
+  ShoppingCart,
 } from "lucide-react";
 import SidebarClient from "./SidebarClient";
 
@@ -38,6 +42,10 @@ export const ICON_MAP: Record<string, LucideIcon> = {
   FileStack,
   Award,
   Truck,
+  Clock,
+  FileSpreadsheet,
+  Mail,
+  ShoppingCart,
 };
 
 export type SidebarItem = {
