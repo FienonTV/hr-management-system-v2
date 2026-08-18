@@ -82,6 +82,7 @@ export async function setModuleActive(
       metadata: { moduleKey: moduleDef.key },
     });
 
+    revalidatePath("/dashboard");
     revalidatePath("/dashboard/modules/admin/modules");
     return { success: true };
   });
