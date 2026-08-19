@@ -2,7 +2,6 @@
 
 import { withTenant } from "@/lib/db/tenant";
 import { requirePermission } from "@/lib/permissions";
-import { logAudit } from "@/lib/audit";
 import type { Role, Permission, User } from "@prisma/client";
 
 export type RoleWithPermissions = Role & {
@@ -94,13 +93,17 @@ export async function createRole(
       },
     });
 
-    await logAudit({
-      tenantId,
-      userId: session.user.id,
-      action: "role.create",
-      resourceType: "role",
-      resourceId: role.id,
-      metadata: { name: role.name, description: role.description, permissions: permissionKeys },
+    await tx.auditLog.create({
+      data: {
+        tenantId,
+        userId: session.user.id,
+        action: "role.create",
+        resourceType: "role",
+        resourceId: role.id,
+        metadata: { name: role.name, description: role.description, permissions: permissionKeys },
+        ipAddress: "unknown",
+        userAgent: "unknown",
+      },
     });
 
     return { success: true, roleId: role.id };
@@ -160,13 +163,17 @@ export async function updateRole(
       },
     });
 
-    await logAudit({
-      tenantId,
-      userId: session.user.id,
-      action: "role.update",
-      resourceType: "role",
-      resourceId: id,
-      metadata: { name: role.name, description: role.description, permissions: permissionKeys },
+    await tx.auditLog.create({
+      data: {
+        tenantId,
+        userId: session.user.id,
+        action: "role.update",
+        resourceType: "role",
+        resourceId: id,
+        metadata: { name: role.name, description: role.description, permissions: permissionKeys },
+        ipAddress: "unknown",
+        userAgent: "unknown",
+      },
     });
 
     return { success: true };
@@ -191,13 +198,17 @@ export async function deleteRole(id: string): Promise<{ success: boolean; error?
       where: { id },
     });
 
-    await logAudit({
-      tenantId,
-      userId: session.user.id,
-      action: "role.delete",
-      resourceType: "role",
-      resourceId: id,
-      metadata: { name: existing.name },
+    await tx.auditLog.create({
+      data: {
+        tenantId,
+        userId: session.user.id,
+        action: "role.delete",
+        resourceType: "role",
+        resourceId: id,
+        metadata: { name: existing.name },
+        ipAddress: "unknown",
+        userAgent: "unknown",
+      },
     });
 
     return { success: true };
@@ -259,13 +270,17 @@ export async function assignRoleToUser(
       },
     });
 
-    await logAudit({
-      tenantId,
-      userId: session.user.id,
-      action: "user.role.assign",
-      resourceType: "user",
-      resourceId: userId,
-      metadata: { roleId, roleName: role.name, userEmail: user.email },
+    await tx.auditLog.create({
+      data: {
+        tenantId,
+        userId: session.user.id,
+        action: "user.role.assign",
+        resourceType: "user",
+        resourceId: userId,
+        metadata: { roleId, roleName: role.name, userEmail: user.email },
+        ipAddress: "unknown",
+        userAgent: "unknown",
+      },
     });
 
     return { success: true };
@@ -290,13 +305,17 @@ export async function removeRoleFromUser(
       },
     });
 
-    await logAudit({
-      tenantId,
-      userId: session.user.id,
-      action: "user.role.remove",
-      resourceType: "user",
-      resourceId: userId,
-      metadata: { roleId, roleName: role?.name, userEmail: user?.email },
+    await tx.auditLog.create({
+      data: {
+        tenantId,
+        userId: session.user.id,
+        action: "user.role.remove",
+        resourceType: "user",
+        resourceId: userId,
+        metadata: { roleId, roleName: role?.name, userEmail: user?.email },
+        ipAddress: "unknown",
+        userAgent: "unknown",
+      },
     });
 
     return { success: true };
