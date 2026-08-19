@@ -25,6 +25,6 @@ export async function withTenant<T>(
     await tx.$executeRawUnsafe(`SET LOCAL app.current_tenant = '${escapedTenantId}'`);
     await tx.$executeRawUnsafe(`SET LOCAL app.current_tenant_id = '${escapedTenantId}'`);
 
-    return operation(tx);
-  });
+    return await operation(tx);
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }

@@ -10,7 +10,7 @@ const globalForPrisma = globalThis as unknown as {
 function createPrismaClient(connectionString: string): PrismaClient {
   const pool = new Pool({
     connectionString,
-    max: 20,
+    max: 1,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 5000,
     allowExitOnIdle: true,
