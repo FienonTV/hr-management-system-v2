@@ -73,13 +73,17 @@ export async function setModuleActive(
       create: { tenantId, moduleId, isActive: active },
     });
 
-    await logAudit({
-      tenantId,
-      userId: session.user.id,
-      action: active ? "tenant.activate" : "tenant.deactivate",
-      resourceType: "tenantModule",
-      resourceId: moduleId,
-      metadata: { moduleKey: moduleDef.key },
+    await tx.auditLog.create({
+      data: {
+        tenantId,
+        userId: session.user.id,
+        action: active ? "tenant.activate" : "tenant.deactivate",
+        resourceType: "tenantModule",
+        resourceId: moduleId,
+        metadata: { moduleKey: moduleDef.key },
+        ipAddress: "unknown",
+        userAgent: "unknown",
+      },
     });
 
     revalidatePath("/dashboard");

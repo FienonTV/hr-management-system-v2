@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { getEffectiveTenantId } from "@/lib/session";
 import { getEffectivePermissions } from "@/lib/permissions";
 import { getDashboardData } from "@/lib/actions/dashboard";
+import { getActiveModuleKeys } from "@/lib/actions/modules";
 import { absenceTypeLabel } from "@/lib/absenceUtils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, Plane, Briefcase, Euro, ShoppingCart } from "lucide-react";
@@ -12,13 +13,17 @@ import ModuleDisabledModal from "./ModuleDisabledModal";
 async function DashboardPageContent() {
   const session = await auth();
   const tenantId = session ? getEffectiveTenantId(session) : "";
-  const effectivePermissions = session && tenantId ? await getEffectivePermissions(session.user.id, tenantId) : new Set<string>();
-  const canReadDocuments = effectivePermissions.has("documents:read");
-  const canReadEmployees = effectivePermissions.has("employees:read");
-  const canReadAbsences = effectivePermissions.has("absences:read");
-  const canReadProjects = effectivePermissions.has("projects:read");
-  const canReadTimeTracking = effectivePermissions.has("timeTracking:read");
-  const canReadWooCommerce = effectivePermissions.has("woocommerce:read");
+  const [effectivePermissions, activeModuleKeys] = await Promise.all([
+    session && tenantId ? getEffectivePermissions(session.user.id, tenantId) : Promise.resolve(new Set<string>()),
+    tenantId ? getActiveModuleKeys(tenantId) : Promise.resolve(new Set<string>()),
+  ]);
+
+  const canReadDocuments = effectivePermissions.has("documents:read") && activeModuleKeys.has("employees");
+  const canReadEmployees = effectivePermissions.has("employees:read") && activeModuleKeys.has("employees");
+  const canReadAbsences = effectivePermissions.has("absences:read") && activeModuleKeys.has("absences");
+  const canReadProjects = effectivePermissions.has("projects:read") && activeModuleKeys.has("projects");
+  const canReadTimeTracking = effectivePermissions.has("timeTracking:read") && activeModuleKeys.has("time-tracking");
+  const canReadWooCommerce = effectivePermissions.has("woocommerce:read") && activeModuleKeys.has("woocommerce");
 
   const {
     expiringDocuments,
