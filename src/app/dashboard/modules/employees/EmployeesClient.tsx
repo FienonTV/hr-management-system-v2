@@ -22,6 +22,7 @@ interface SortState {
 
 interface EmployeesClientProps {
   initialEmployees: EmployeeWithRelations[];
+  permissions: string[];
 }
 
 const statusLabels: Record<string, string> = {
@@ -123,7 +124,10 @@ function sortEmployees(employees: EmployeeWithRelations[], sort: SortState): Emp
   return sorted;
 }
 
-export default function EmployeesClient({ initialEmployees }: EmployeesClientProps) {
+export default function EmployeesClient({ initialEmployees, permissions }: EmployeesClientProps) {
+  const canCreate = permissions.includes("employees:create");
+  const canExport = permissions.includes("employees:export");
+
   const [query, setQuery] = useState("");
   const [allEmployees] = useState(initialEmployees);
   const [showFilters, setShowFilters] = useState(false);
@@ -211,34 +215,38 @@ export default function EmployeesClient({ initialEmployees }: EmployeesClientPro
           <p className="mt-2 text-sm text-gray-600">Verwalten Sie alle Mitarbeiter-Stammdaten</p>
         </div>
         <div className="flex items-center space-x-2">
-          <button
-            type="button"
-            onClick={async () => {
-              const result = await exportEmployeesToCSV();
-              if (result.success && result.csv) {
-                const blob = new Blob([result.csv], { type: "text/csv;charset=utf-8;" });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement("a");
-                link.href = url;
-                link.download = `Mitarbeiter_${new Date().toISOString().slice(0, 10)}.csv`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
-              }
-            }}
-            className="flex items-center space-x-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-          >
-            <Download className="h-5 w-5" />
-            <span>Export CSV</span>
-          </button>
-          <Link
-            href="/dashboard/modules/employees/new"
-            className="flex items-center space-x-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 transition-colors"
-          >
-            <Plus className="h-5 w-5" />
-            <span>Neuer Mitarbeiter</span>
-          </Link>
+          {canExport && (
+            <button
+              type="button"
+              onClick={async () => {
+                const result = await exportEmployeesToCSV();
+                if (result.success && result.csv) {
+                  const blob = new Blob([result.csv], { type: "text/csv;charset=utf-8;" });
+                  const url = URL.createObjectURL(blob);
+                  const link = document.createElement("a");
+                  link.href = url;
+                  link.download = `Mitarbeiter_${new Date().toISOString().slice(0, 10)}.csv`;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  URL.revokeObjectURL(url);
+                }
+              }}
+              className="flex items-center space-x-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              <Download className="h-5 w-5" />
+              <span>Export CSV</span>
+            </button>
+          )}
+          {canCreate && (
+            <Link
+              href="/dashboard/modules/employees/new"
+              className="flex items-center space-x-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 transition-colors"
+            >
+              <Plus className="h-5 w-5" />
+              <span>Neuer Mitarbeiter</span>
+            </Link>
+          )}
         </div>
       </div>
 

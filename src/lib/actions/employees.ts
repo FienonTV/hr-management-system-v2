@@ -1,7 +1,7 @@
 'use server';
 
 import { withTenant } from "@/lib/db/tenant";
-import { requirePermission } from "@/lib/permissions";
+import { requirePermission, getEffectivePermissions } from "@/lib/permissions";
 import { revalidatePath } from 'next/cache';
 import type { Employee, User } from "@prisma/client";
 import { Prisma } from "@prisma/client";
@@ -145,10 +145,18 @@ function validateCustomFields(input: Record<string, unknown>, definitions: { key
 }
 
 export async function getEmployees(search?: string): Promise<(Omit<Employee, "hourlyWage"> & { hourlyWage?: number | null; userAccount?: User | null; position?: { name: string } | null; department?: { name: string } | null })[]> {
-  const { tenantId } = await requirePermission("employees:read");
+  const { tenantId, session } = await requirePermission("employees:read:own");
+  const permissions = await getEffectivePermissions(session.user.id, tenantId);
+  const canReadAll = permissions.has("employees:read") || permissions.has("employees:read:all");
   return withTenant(tenantId, async (tx) => {
     const normalizedSearch = search?.trim();
     const where: Prisma.EmployeeWhereInput = { tenantId };
+
+    if (!canReadAll) {
+      // Own only: find employee record linked to current user account
+      where.userAccount = { id: session.user.id };
+    }
+
     if (normalizedSearch) {
       where.OR = [
         { firstName: { contains: normalizedSearch, mode: "insensitive" } },
@@ -173,10 +181,21 @@ export async function getEmployees(search?: string): Promise<(Omit<Employee, "ho
 }
 
 export async function getEmployeeById(id: string): Promise<(Employee & { userAccount?: User | null; position?: { name: string; id: string } | null; department?: { name: string; id: string } | null; payGrade?: { name: string; id: string } | null; customFields?: Prisma.JsonValue | null }) | null> {
-  const { tenantId } = await requirePermission("employees:read");
+  const { tenantId, session } = await requirePermission("employees:read:own");
+  const permissions = await getEffectivePermissions(session.user.id, tenantId);
+  const canReadAll = permissions.has("employees:read") || permissions.has("employees:read:all");
+  const canReadPublic = canReadAll || permissions.has("employees:read:public");
+  const canReadPersonal = canReadAll || permissions.has("employees:read:personal");
+  const canReadContract = canReadAll || permissions.has("employees:read:contract");
+  const canReadHrConfidential = canReadAll || permissions.has("employees:read:hr_confidential");
+
   return withTenant(tenantId, async (tx) => {
-    const employee = await tx.employee.findUnique({
-      where: { id },
+    const employee = await tx.employee.findFirst({
+      where: {
+        id,
+        tenantId,
+        ...(canReadAll ? {} : { userId: session.user.id }),
+      },
       include: { userAccount: true, position: { select: { name: true, id: true } }, department: { select: { name: true, id: true } }, payGrade: { select: { name: true, id: true } } },
     });
     if (!employee) return null;
@@ -185,18 +204,50 @@ export async function getEmployeeById(id: string): Promise<(Employee & { userAcc
     const sensitiveData = employee.sensitiveData as Record<string, string | null | undefined> | null | undefined;
 
     return {
-      ...employee,
-      street: address?.street ?? null,
-      zip: address?.zip ?? null,
-      city: address?.city ?? null,
-      country: address?.country ?? null,
-      taxId: sensitiveData?.taxId ?? null,
-      socialSecurityNumber: sensitiveData?.socialSecurityNumber ?? null,
-      iban: sensitiveData?.iban ?? null,
-      bic: sensitiveData?.bic ?? null,
-      emergencyContactName: sensitiveData?.emergencyContactName ?? null,
-      emergencyContactPhone: sensitiveData?.emergencyContactPhone ?? null,
-      hourlyWage: employee.hourlyWage ? Number(employee.hourlyWage) : null,
+      id: employee.id,
+      tenantId: employee.tenantId,
+      firstName: canReadPublic ? employee.firstName : null,
+      lastName: canReadPublic ? employee.lastName : null,
+      email: canReadPublic ? employee.email : null,
+      phone: canReadPublic ? employee.phone : null,
+      departmentId: canReadPublic ? employee.departmentId : null,
+      positionId: canReadPublic ? employee.positionId : null,
+      employmentType: canReadPublic ? employee.employmentType : null,
+      status: canReadPublic ? employee.status : null,
+      birthDate: canReadPersonal ? employee.birthDate : null,
+      gender: canReadPersonal ? employee.gender : null,
+      address: canReadPersonal ? employee.address : null,
+      notes: canReadPersonal ? employee.notes : null,
+      street: canReadPersonal ? address?.street ?? null : null,
+      zip: canReadPersonal ? address?.zip ?? null : null,
+      city: canReadPersonal ? address?.city ?? null : null,
+      country: canReadPersonal ? address?.country ?? null : null,
+      employeeNumber: canReadContract ? employee.employeeNumber : null,
+      startDate: canReadContract ? employee.startDate : null,
+      exitDate: canReadContract ? employee.exitDate : null,
+      hourlyWage: canReadContract ? (employee.hourlyWage ? Number(employee.hourlyWage) : null) : null,
+      vacationDays: canReadContract ? employee.vacationDays : null,
+      probationEndDate: canReadContract ? employee.probationEndDate : null,
+      fixedTermEndDate: canReadContract ? employee.fixedTermEndDate : null,
+      payGradeId: canReadContract ? employee.payGradeId : null,
+      keyNumber: canReadHrConfidential ? employee.keyNumber : null,
+      chipNumber: canReadHrConfidential ? employee.chipNumber : null,
+      driverLicenseClasses: canReadHrConfidential ? employee.driverLicenseClasses : null,
+      forkliftLicense: canReadHrConfidential ? employee.forkliftLicense : null,
+      sensitiveData: canReadHrConfidential ? employee.sensitiveData : null,
+      taxId: canReadHrConfidential ? sensitiveData?.taxId ?? null : null,
+      socialSecurityNumber: canReadHrConfidential ? sensitiveData?.socialSecurityNumber ?? null : null,
+      iban: canReadHrConfidential ? sensitiveData?.iban ?? null : null,
+      bic: canReadHrConfidential ? sensitiveData?.bic ?? null : null,
+      emergencyContactName: canReadHrConfidential ? sensitiveData?.emergencyContactName ?? null : null,
+      emergencyContactPhone: canReadHrConfidential ? sensitiveData?.emergencyContactPhone ?? null : null,
+      customFields: canReadHrConfidential ? employee.customFields : null,
+      createdAt: employee.createdAt,
+      updatedAt: employee.updatedAt,
+      userAccount: canReadPublic ? employee.userAccount : null,
+      position: canReadPublic ? employee.position : null,
+      department: canReadPublic ? employee.department : null,
+      payGrade: canReadContract ? employee.payGrade : null,
     } as unknown as Employee & { userAccount?: User | null; position?: { name: string; id: string } | null; department?: { name: string; id: string } | null; payGrade?: { name: string; id: string } | null; customFields?: Prisma.JsonValue | null };
   });
 }

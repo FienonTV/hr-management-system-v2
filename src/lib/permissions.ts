@@ -35,6 +35,22 @@ export async function getEffectivePermissions(
 
     const keys = new Set<string>();
 
+    // Legacy compatibility: old employees:read/update grant all scoped equivalents
+    const hasLegacyRead = permissions.some((p) => p.key === "employees:read");
+    const hasLegacyUpdate = permissions.some((p) => p.key === "employees:update");
+    if (hasLegacyRead) {
+      keys.add("employees:read:own");
+      keys.add("employees:read:all");
+      keys.add("employees:read:public");
+      keys.add("employees:read:personal");
+      keys.add("employees:read:contract");
+      keys.add("employees:read:hr_confidential");
+    }
+    if (hasLegacyUpdate) {
+      keys.add("employees:update:own");
+      keys.add("employees:update:all");
+    }
+
     const rolePermissions = await tx.rolePermission.findMany({
       where: {
         role: { users: { some: { userId } } },

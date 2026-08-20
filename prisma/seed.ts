@@ -76,9 +76,17 @@ async function main() {
 
   // Upsert default permissions
   const permissionDefinitions = [
-    { key: 'employees:read', module: 'employees', resource: 'employee', action: 'read', description: 'Mitarbeiter anzeigen' },
+    { key: 'employees:read', module: 'employees', resource: 'employee', action: 'read', description: 'Mitarbeiter anzeigen (legacy)' },
+    { key: 'employees:read:own', module: 'employees', resource: 'employee', action: 'read', description: 'Eigene Mitarbeiterdaten anzeigen' },
+    { key: 'employees:read:all', module: 'employees', resource: 'employee', action: 'read', description: 'Alle Mitarbeiter anzeigen' },
+    { key: 'employees:read:public', module: 'employees', resource: 'employee', action: 'read', description: 'Öffentliche Mitarbeiterdaten anzeigen' },
+    { key: 'employees:read:personal', module: 'employees', resource: 'employee', action: 'read', description: 'Persönliche Mitarbeiterdaten anzeigen' },
+    { key: 'employees:read:contract', module: 'employees', resource: 'employee', action: 'read', description: 'Vertragsdaten anzeigen' },
+    { key: 'employees:read:hr_confidential', module: 'employees', resource: 'employee', action: 'read', description: 'HR-vertrauliche Daten anzeigen' },
     { key: 'employees:create', module: 'employees', resource: 'employee', action: 'create', description: 'Mitarbeiter erstellen' },
-    { key: 'employees:update', module: 'employees', resource: 'employee', action: 'update', description: 'Mitarbeiter bearbeiten' },
+    { key: 'employees:update', module: 'employees', resource: 'employee', action: 'update', description: 'Mitarbeiter bearbeiten (legacy)' },
+    { key: 'employees:update:own', module: 'employees', resource: 'employee', action: 'update', description: 'Eigene Mitarbeiterdaten bearbeiten' },
+    { key: 'employees:update:all', module: 'employees', resource: 'employee', action: 'update', description: 'Alle Mitarbeiter bearbeiten' },
     { key: 'employees:delete', module: 'employees', resource: 'employee', action: 'delete', description: 'Mitarbeiter löschen' },
     { key: 'employees:invite', module: 'employees', resource: 'employee', action: 'invite', description: 'Mitarbeiter einladen' },
     { key: 'employees:export', module: 'employees', resource: 'employee', action: 'export', description: 'Mitarbeiter als CSV exportieren' },
