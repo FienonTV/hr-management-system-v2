@@ -460,7 +460,43 @@ export default function PlanningClient({
             <RotateCcw className="mr-1 h-4 w-4" />
             Komplett zurücksetzen
           </Button>
-          <Button variant="outline" onClick={() => window.print()}>
+          <Button
+            variant="outline"
+            onClick={() => {
+              const printContent = document.getElementById("print-area");
+              if (!printContent) return;
+              const html = `
+                <!DOCTYPE html>
+                <html>
+                  <head>
+                    <title>Tagesplanung ${date}</title>
+                    <style>
+                      @page { margin: 10mm; }
+                      body { margin: 0; padding: 10mm; font-family: Arial, sans-serif; font-size: 11pt; color: black; background: white; }
+                      h2 { font-size: 16pt; margin: 0 0 16px 0; padding-bottom: 6px; border-bottom: 2px solid black; }
+                      .plan-site { margin-bottom: 16px; border: 1px solid #999; padding: 12px; page-break-inside: avoid; }
+                      .site-name { font-size: 14pt; font-weight: 800; text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 4px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+                      .site-location { font-size: 10pt; font-weight: 600; margin-bottom: 6px; }
+                      .site-time { font-size: 11pt; font-weight: 600; margin-bottom: 10px; }
+                      .site-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-top: 6px; font-size: 10pt; line-height: 1.4; }
+                      .site-row .label { font-weight: 700; min-width: 100px; text-transform: uppercase; font-size: 9pt; }
+                      .site-row .value { flex: 1; text-align: right; font-weight: 500; }
+                    </style>
+                  </head>
+                  <body>${printContent.innerHTML}</body>
+                </html>
+              `;
+              const printWindow = window.open("", "_blank");
+              if (!printWindow) return;
+              printWindow.document.write(html);
+              printWindow.document.close();
+              printWindow.focus();
+              setTimeout(() => {
+                printWindow.print();
+                printWindow.close();
+              }, 300);
+            }}
+          >
             <Printer className="mr-1 h-4 w-4" />
             Drucken
           </Button>
