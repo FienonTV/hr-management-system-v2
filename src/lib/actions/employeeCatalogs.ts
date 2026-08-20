@@ -1,15 +1,15 @@
 'use server';
 
 import { withTenant } from "@/lib/db/tenant";
-import { requirePermission } from "@/lib/permissions";
-import { revalidatePath } from "next/cache";
+import { requirePermission, requireAnyPermission } from "@/lib/permissions";
+import { revalidatePath } from 'next/cache';
 import { logAudit } from "@/lib/audit";
 import type { Department, Position, PayGrade, CustomFieldDefinition, CustomFieldType } from "@prisma/client";
 
 // ----------------------------- Departments ------------------------------
 
 export async function getDepartments() {
-  const { tenantId } = await requirePermission("employees:read");
+  const { tenantId } = await requireAnyPermission("employees:read", "employees:read:own", "employees:read:all");
   return withTenant(tenantId, async (tx) => {
     return tx.department.findMany({
       where: { tenantId, isActive: true },
@@ -91,7 +91,7 @@ export async function deleteDepartment(id: string) {
 // ----------------------------- Positions --------------------------------
 
 export async function getPositions() {
-  const { tenantId } = await requirePermission("employees:read");
+  const { tenantId } = await requireAnyPermission("employees:read", "employees:read:own", "employees:read:all");
   return withTenant(tenantId, async (tx) => {
     return tx.position.findMany({
       where: { tenantId, isActive: true },
@@ -173,7 +173,7 @@ export async function deletePosition(id: string) {
 // ----------------------------- Pay Grades -------------------------------
 
 export async function getPayGrades() {
-  const { tenantId } = await requirePermission("employees:read");
+  const { tenantId } = await requireAnyPermission("employees:read", "employees:read:own", "employees:read:all");
   return withTenant(tenantId, async (tx) => {
     return tx.payGrade.findMany({
       where: { tenantId, isActive: true },
@@ -257,7 +257,7 @@ export async function deletePayGrade(id: string) {
 const CUSTOM_FIELD_TYPES: CustomFieldType[] = ["TEXT", "NUMBER", "DATE", "BOOLEAN", "SELECT", "MULTI_SELECT"];
 
 export async function getCustomFieldDefinitions(appliesTo: string = "employee") {
-  const { tenantId } = await requirePermission("employees:read");
+  const { tenantId } = await requireAnyPermission("employees:read", "employees:read:own", "employees:read:all");
   return withTenant(tenantId, async (tx) => {
     return tx.customFieldDefinition.findMany({
       where: { tenantId, appliesTo, isActive: true },

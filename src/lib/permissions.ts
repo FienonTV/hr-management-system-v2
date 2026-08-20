@@ -102,6 +102,25 @@ export async function getCurrentUserPermissions(): Promise<Set<string>> {
 }
 
 /**
+ * Prüft, ob der aktuelle User mindestens eine der angegebenen Berechtigungen hat.
+ */
+export async function requireAnyPermission(...permissionKeys: PermissionKey[]) {
+  const session = await auth();
+  if (!session?.user) {
+    throw new Error("Nicht authentifiziert");
+  }
+
+  const tenantId = getEffectiveTenantId(session);
+  for (const key of permissionKeys) {
+    if (await hasPermission(session.user.id, tenantId, key)) {
+      return { session, tenantId };
+    }
+  }
+
+  throw new Error("Keine Berechtigung");
+}
+
+/**
  * Prüft die Berechtigung für die aktuelle Session und liefert tenantId + session zurück.
  * Wirft Fehler bei fehlender Authentifizierung oder Berechtigung.
  */
