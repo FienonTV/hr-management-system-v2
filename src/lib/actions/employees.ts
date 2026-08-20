@@ -153,7 +153,7 @@ export async function getEmployees(search?: string): Promise<(Omit<Employee, "ho
     const where: Prisma.EmployeeWhereInput = { tenantId };
 
     if (!canReadAll) {
-      // Own only: find employee record linked to current user account
+      // Own only: find employee record whose linked user account is the current user
       where.userAccount = { id: session.user.id };
     }
 
