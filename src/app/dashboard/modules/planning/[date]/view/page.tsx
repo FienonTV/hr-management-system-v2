@@ -5,7 +5,7 @@ import { getDailyPlan, getPlanningEmployees, getPlanningSettings, getActiveProje
 import { getAvailableVehicles } from "@/lib/actions/vehicles";
 import { hasPermission } from "@/lib/permissions";
 import { getEffectiveTenantId } from "@/lib/session";
-import PlanningClient from "./PlanningClient";
+import PlanningReadOnlyClient from "../PlanningReadOnlyClient";
 
 function serialize<T>(list: T[]): T[] {
   return JSON.parse(JSON.stringify(list)) as T[];
@@ -16,27 +16,25 @@ function serializePlan(plan: DailyPlanWithSites | null): DailyPlanWithSites | nu
   return JSON.parse(JSON.stringify(plan));
 }
 
-export default async function DailyPlanningPage({ params }: { params: Promise<{ date: string }> }) {
+export default async function PlanningViewPage({ params }: { params: Promise<{ date: string }> }) {
   await guardModule("planning");
   const session = await auth();
   if (!session?.user) redirect("/login");
 
   const tenantId = getEffectiveTenantId(session);
   const canEdit = await hasPermission(session.user.id, tenantId, "planning:update");
+  if (canEdit) {
+    redirect(`/dashboard/modules/planning/${(await params).date}`);
+  }
 
   const { date } = await params;
 
-  if (!canEdit) {
-    redirect(`/dashboard/modules/planning/${date}/view`);
-  }
-
-  const [planResult, employeesRaw, vehiclesRaw, settingsRaw, projectsRaw, departments] = await Promise.all([
+  const [planResult, employeesRaw, vehiclesRaw, settingsRaw, projectsRaw] = await Promise.all([
     getDailyPlan(date),
     getPlanningEmployees(),
     getAvailableVehicles(),
     getPlanningSettings(),
     getActiveProjects(),
-    getPlanningDepartments(),
   ]);
 
   if (!planResult.success) {
@@ -65,22 +63,17 @@ export default async function DailyPlanningPage({ params }: { params: Promise<{ 
     poolDepartmentIds: string[];
   };
 
-  const employees = serialize(employeesRaw);
-  const vehicles = serialize(vehiclesRaw);
-  const projects = serialize(projectsRaw);
-
   return (
-    <PlanningClient
+    <PlanningReadOnlyClient
       date={date}
       initialPlan={serializePlan(planResult.plan)}
       isTemplate={planResult.isTemplate}
       isHoliday={planResult.isHoliday}
       holidayName={planResult.holidayName}
-      employees={employees}
-      vehicles={vehicles}
+      employees={serialize(employeesRaw)}
+      vehicles={serialize(vehiclesRaw)}
       settings={typedSettings}
-      projects={projects}
-      departments={departments}
+      projects={serialize(projectsRaw)}
     />
   );
 }
