@@ -194,7 +194,7 @@ export async function getEmployeeById(id: string): Promise<(Employee & { userAcc
       where: {
         id,
         tenantId,
-        ...(canReadAll ? {} : { userId: session.user.id }),
+        ...(canReadAll ? {} : { userAccount: { id: session.user.id } }),
       },
       include: { userAccount: true, position: { select: { name: true, id: true } }, department: { select: { name: true, id: true } }, payGrade: { select: { name: true, id: true } } },
     });
