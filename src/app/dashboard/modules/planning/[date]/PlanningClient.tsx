@@ -529,8 +529,27 @@ export default function PlanningClient({
                     <Input type="time" value={site.startTime} onChange={(e) => updateSiteField(siteIdx, "startTime", e.target.value)} className="w-24" />
                     <span className="text-gray-400 text-sm">–</span>
                     <Input type="time" value={site.endTime} onChange={(e) => updateSiteField(siteIdx, "endTime", e.target.value)} className="w-24" />
-                    <Button className="h-8 w-8 p-0" onClick={() => { setEditingSite(null); saveToServer(sites); }}><Check className="h-4 w-4" /></Button>
-                    <Button className="h-8 w-8 p-0" variant="outline" onClick={() => { setEditingSite(null); removeSite(siteIdx); }}><X className="h-4 w-4" /></Button>
+                    <Button
+                      className="h-8 w-8 p-0"
+                      onClick={() => {
+                        setSites((prev) => {
+                          const next = [...prev];
+                          next[siteIdx] = { ...next[siteIdx], isEditing: false };
+                          return next;
+                        });
+                        setEditingSite(null);
+                        saveToServer(sites.map((s, i) => (i === siteIdx ? { ...s, isEditing: false } : s)));
+                      }}
+                    >
+                      <Check className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      className="h-8 w-8 p-0"
+                      variant="outline"
+                      onClick={() => { setEditingSite(null); removeSite(siteIdx); }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
                   </div>
                 ) : (
                   <div className="flex items-center justify-between border-b border-gray-100 pl-2 pr-4 py-3">

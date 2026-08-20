@@ -3,7 +3,6 @@
 import { withTenant } from "@/lib/db/tenant";
 import { requirePermission } from "@/lib/permissions";
 import { revalidatePath } from "next/cache";
-import { logAudit } from "@/lib/audit";
 import type { DailyPlan, DailyPlanSite, DailyPlanAssignment, Vehicle, Employee, Project } from "@prisma/client";
 import { z } from "zod";
 import { getLastWorkingDay, parsePoolDepartments } from "@/lib/planningUtils";
@@ -167,13 +166,17 @@ export async function saveDailyPlan(input: DailyPlanInput): Promise<{ success: t
       }
     }
 
-    await logAudit({
-      tenantId,
-      userId: session.user.id,
-      action: "planning.save",
-      resourceType: "dailyPlan",
-      resourceId: plan.id,
-      metadata: { date: parsed.data.date },
+    await tx.auditLog.create({
+      data: {
+        tenantId,
+        userId: session.user.id,
+        action: "planning.save",
+        resourceType: "dailyPlan",
+        resourceId: plan.id,
+        metadata: { date: parsed.data.date },
+        ipAddress: "unknown",
+        userAgent: "unknown",
+      },
     });
 
     revalidatePath("/dashboard/modules/planning");
@@ -191,7 +194,10 @@ export async function saveDailyPlan(input: DailyPlanInput): Promise<{ success: t
       },
     });
 
-    return { success: true, plan: saved as DailyPlanWithSites };
+    // Convert Decimal values before returning to client.
+    const serialized = JSON.parse(JSON.stringify(saved));
+
+    return { success: true, plan: serialized as DailyPlanWithSites };
   });
 }
 
@@ -202,13 +208,17 @@ export async function deleteDailyPlan(dateStr: string): Promise<{ success: true 
     const plan = await tx.dailyPlan.findUnique({ where: { tenantId_date: { tenantId, date } } });
     if (!plan) return { success: false, error: "Plan nicht gefunden" };
     await tx.dailyPlan.delete({ where: { id: plan.id } });
-    await logAudit({
-      tenantId,
-      userId: session.user.id,
-      action: "planning.delete",
-      resourceType: "dailyPlan",
-      resourceId: plan.id,
-      metadata: { date: dateStr },
+    await tx.auditLog.create({
+      data: {
+        tenantId,
+        userId: session.user.id,
+        action: "planning.delete",
+        resourceType: "dailyPlan",
+        resourceId: plan.id,
+        metadata: { date: dateStr },
+        ipAddress: "unknown",
+        userAgent: "unknown",
+      },
     });
     revalidatePath("/dashboard/modules/planning");
     return { success: true };
@@ -289,13 +299,17 @@ export async function savePlanningSettings(settings: {
       });
     }
 
-    await logAudit({
-      tenantId,
-      userId: session.user.id,
-      action: "planning.settings.update",
-      resourceType: "tenantSetting",
-      resourceId: "",
-      metadata: { keys: upserts.map((u) => u.key) },
+    await tx.auditLog.create({
+      data: {
+        tenantId,
+        userId: session.user.id,
+        action: "planning.settings.update",
+        resourceType: "tenantSetting",
+        resourceId: "",
+        metadata: { keys: upserts.map((u) => u.key) },
+        ipAddress: "unknown",
+        userAgent: "unknown",
+      },
     });
 
     revalidatePath("/dashboard/modules/admin/settings");

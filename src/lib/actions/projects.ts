@@ -3,7 +3,6 @@
 import { withTenant } from "@/lib/db/tenant";
 import { requirePermission } from "@/lib/permissions";
 import { revalidatePath } from "next/cache";
-import { logAudit } from "@/lib/audit";
 import type { Project, ProjectEmployee, ProjectMilestone } from "@prisma/client";
 
 export type ProjectWithDetails = Project & {
@@ -87,13 +86,17 @@ export async function createProject(data: {
     }
 
     revalidatePath("/dashboard/modules/projects");
-    await logAudit({
-      tenantId,
-      userId: session.user.id,
-      action: "project.create",
-      resourceType: "project",
-      resourceId: project.id,
-      metadata: { name: data.name },
+    await tx.auditLog.create({
+      data: {
+        tenantId,
+        userId: session.user.id,
+        action: "project.create",
+        resourceType: "project",
+        resourceId: project.id,
+        metadata: { name: data.name },
+        ipAddress: "unknown",
+        userAgent: "unknown",
+      },
     });
 
     return { success: true, project };
@@ -148,13 +151,17 @@ export async function updateProject(
 
     revalidatePath("/dashboard/modules/projects");
     revalidatePath(`/dashboard/modules/projects/${id}`);
-    await logAudit({
-      tenantId,
-      userId: session.user.id,
-      action: "project.update",
-      resourceType: "project",
-      resourceId: id,
-      metadata: { name: project.name },
+    await tx.auditLog.create({
+      data: {
+        tenantId,
+        userId: session.user.id,
+        action: "project.update",
+        resourceType: "project",
+        resourceId: id,
+        metadata: { name: project.name },
+        ipAddress: "unknown",
+        userAgent: "unknown",
+      },
     });
 
     return { success: true, project };
@@ -170,13 +177,17 @@ export async function deleteProject(id: string): Promise<{ success: true } | { s
     await tx.project.delete({ where: { id, tenantId } });
 
     revalidatePath("/dashboard/modules/projects");
-    await logAudit({
-      tenantId,
-      userId: session.user.id,
-      action: "project.delete",
-      resourceType: "project",
-      resourceId: id,
-      metadata: { name: existing.name },
+    await tx.auditLog.create({
+      data: {
+        tenantId,
+        userId: session.user.id,
+        action: "project.delete",
+        resourceType: "project",
+        resourceId: id,
+        metadata: { name: existing.name },
+        ipAddress: "unknown",
+        userAgent: "unknown",
+      },
     });
 
     return { success: true };
@@ -203,13 +214,17 @@ export async function createProjectMilestone(
     });
 
     revalidatePath(`/dashboard/modules/projects/${projectId}`);
-    await logAudit({
-      tenantId,
-      userId: session.user.id,
-      action: "project.milestone.create",
-      resourceType: "project",
-      resourceId: projectId,
-      metadata: { title: data.title },
+    await tx.auditLog.create({
+      data: {
+        tenantId,
+        userId: session.user.id,
+        action: "project.milestone.create",
+        resourceType: "project",
+        resourceId: projectId,
+        metadata: { title: data.title },
+        ipAddress: "unknown",
+        userAgent: "unknown",
+      },
     });
 
     return { success: true };
@@ -225,13 +240,17 @@ export async function updateMilestoneStatus(id: string, status: MilestoneStatus)
     await tx.projectMilestone.update({ where: { id, tenantId }, data: { status } });
 
     revalidatePath(`/dashboard/modules/projects/${milestone.projectId}`);
-    await logAudit({
-      tenantId,
-      userId: session.user.id,
-      action: "project.milestone.update",
-      resourceType: "projectMilestone",
-      resourceId: id,
-      metadata: { status },
+    await tx.auditLog.create({
+      data: {
+        tenantId,
+        userId: session.user.id,
+        action: "project.milestone.update",
+        resourceType: "projectMilestone",
+        resourceId: id,
+        metadata: { status },
+        ipAddress: "unknown",
+        userAgent: "unknown",
+      },
     });
 
     return { success: true };
