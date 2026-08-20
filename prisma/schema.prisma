@@ -729,6 +729,7 @@ model PayGrade {
 
 enum CustomFieldType {
   TEXT
+  TEXTAREA
   NUMBER
   DATE
   BOOLEAN
@@ -831,7 +832,7 @@ model ProjectCustomValue {
   valueNumber     Decimal? @map("value_number") @db.Decimal(12, 4)
   valueDate       DateTime? @map("value_date")
   valueBoolean    Boolean? @map("value_boolean")
-  valueJson       Json?     // SELECT / MULTI_SELECT
+  valueJson       Json?     @map("value_json") // SELECT / MULTI_SELECT
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 

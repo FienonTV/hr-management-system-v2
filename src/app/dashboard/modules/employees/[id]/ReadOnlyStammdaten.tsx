@@ -2,12 +2,13 @@
 
 import { User, Mail, Phone, MapPin, Building2, Briefcase, Calendar, CreditCard, HeartPulse, FileText } from "lucide-react";
 import type { Employee } from "./types";
+import type { CustomFieldType } from "@prisma/client";
 
 interface CustomFieldDef {
   id: string;
   key: string;
   name: string;
-  fieldType: "TEXT" | "NUMBER" | "DATE" | "BOOLEAN" | "SELECT" | "MULTI_SELECT";
+  fieldType: CustomFieldType;
 }
 
 interface ReadOnlyStammdatenProps {

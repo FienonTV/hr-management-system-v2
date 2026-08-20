@@ -1,13 +1,14 @@
 "use client";
 
 import { useMemo } from "react";
+import type { CustomFieldType } from "@prisma/client";
 
 interface CustomFieldDefinition {
   id: string;
   key: string;
   name: string;
   description?: string | null;
-  fieldType: "TEXT" | "NUMBER" | "DATE" | "BOOLEAN" | "SELECT" | "MULTI_SELECT";
+  fieldType: CustomFieldType;
   isRequired: boolean;
   options: { values: string[] } | null;
   sortOrder: number;

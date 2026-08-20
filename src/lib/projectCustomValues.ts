@@ -12,6 +12,7 @@ export function serializeProjectCustomValue(
 } {
   switch (fieldType) {
     case "TEXT":
+    case "TEXTAREA":
       return { valueText: value == null ? null : String(value) };
     case "NUMBER":
       return { valueNumber: value == null || value === "" ? null : Number(value) };
@@ -44,6 +45,7 @@ export function deserializeProjectCustomValue(
 ): unknown {
   switch (fieldType) {
     case "TEXT":
+    case "TEXTAREA":
       return row.valueText;
     case "NUMBER":
       return row.valueNumber == null ? null : Number(row.valueNumber);

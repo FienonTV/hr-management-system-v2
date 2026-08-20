@@ -12,6 +12,7 @@ import QualifikationenTab from "./QualifikationenTab";
 import AbwesenheitenTab from "./AbwesenheitenTab";
 import type { Employee, FileItem } from "./types";
 import { canReadEmployeeGroup, canUpdateEmployeeGroup, type EmployeeFieldGroup } from "@/lib/employeePermissions";
+import type { CustomFieldType } from "@prisma/client";
 
 type Tab = "stammdaten" | "dokumente" | "user" | "qualifikationen" | "abwesenheiten";
 
@@ -27,7 +28,7 @@ export default function EmployeeDetailClient({ employee, initialFiles, permissio
   const [departments, setDepartments] = useState<Record<string, string>>({});
   const [positions, setPositions] = useState<Record<string, string>>({});
   const [payGrades, setPayGrades] = useState<Record<string, string>>({});
-  const [customFields, setCustomFields] = useState<{ id: string; key: string; name: string; fieldType: "TEXT" | "NUMBER" | "DATE" | "BOOLEAN" | "SELECT" | "MULTI_SELECT" }[]>([]);
+  const [customFields, setCustomFields] = useState<{ id: string; key: string; name: string; fieldType: CustomFieldType }[]>([]);
 
   useEffect(() => {
     let cancelled = false;

@@ -114,6 +114,18 @@ function SingleFieldInput({
     );
   }
 
+  if (fieldType === "TEXTAREA") {
+    return (
+      <textarea
+        className="w-full min-h-[80px] rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+        value={(value as string) ?? ""}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        placeholder={definition.name}
+      />
+    );
+  }
+
   return (
     <Input
       type="text"

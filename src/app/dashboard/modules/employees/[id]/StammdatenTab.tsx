@@ -7,6 +7,7 @@ import { updateEmployee, deleteEmployee } from "@/lib/actions/employees";
 import type { Employee } from "./types";
 import { Field, toDateInputValue } from "./Field";
 import CustomFieldInputs from "../CustomFieldInputs";
+import type { CustomFieldType } from "@prisma/client";
 
 export interface StammdatenTabProps {
   employee: Employee;
@@ -18,7 +19,7 @@ export interface StammdatenTabProps {
     key: string;
     name: string;
     description?: string | null;
-    fieldType: "TEXT" | "NUMBER" | "DATE" | "BOOLEAN" | "SELECT" | "MULTI_SELECT";
+    fieldType: CustomFieldType;
     isRequired: boolean;
     options: { values: string[] } | null;
     sortOrder: number;

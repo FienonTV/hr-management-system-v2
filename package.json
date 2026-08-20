@@ -17,7 +17,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@prisma/adapter-pg": "^7.9.1",
-    "@prisma/client": "^7.8.0",
+    "@prisma/client": "^7.9.1",
     "@prisma/config": "^7.8.0",
     "@tiptap/extension-text-align": "^3.29.0",
     "@tiptap/extension-text-style": "^3.29.0",
