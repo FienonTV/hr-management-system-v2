@@ -2,6 +2,8 @@ import { auth } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import { getProjectById, type ProjectWithDetails } from "@/lib/actions/projects";
 import { getEmployees } from "@/lib/actions/employees";
+import { getProjectLayout } from "@/lib/actions/projectLayouts";
+import { getProjectCustomFieldDefinitions } from "@/lib/actions/projectCatalogs";
 import { guardModule } from "@/lib/actions/moduleGuard";
 import ProjectDetailClient from "./ProjectDetailClient";
 
@@ -17,7 +19,12 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   }
 
   const { id } = await params;
-  const [project, employees] = await Promise.all([getProjectById(id), getEmployees()]);
+  const [project, employees, layout, fieldDefinitions] = await Promise.all([
+    getProjectById(id),
+    getEmployees(),
+    getProjectLayout(),
+    getProjectCustomFieldDefinitions(),
+  ]);
   if (!project) {
     notFound();
   }
@@ -30,6 +37,8 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         firstName: e.firstName,
         lastName: e.lastName,
       }))}
+      layout={layout?.tabs ?? []}
+      fieldDefinitions={fieldDefinitions}
     />
   );
 }

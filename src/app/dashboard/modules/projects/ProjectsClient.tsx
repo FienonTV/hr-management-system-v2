@@ -117,10 +117,13 @@ export default function ProjectsPage() {
           <Briefcase className="h-6 w-6" />
           <h1 className="text-2xl font-bold">Projekte</h1>
         </div>
-        <Button onClick={startCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          Neues Projekt
-        </Button>
+        <div className="flex items-center gap-2">
+          <Link href="/dashboard/modules/admin/project-layout" className="text-sm text-primary hover:underline">Layout bearbeiten</Link>
+          <Button onClick={startCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            Neues Projekt
+          </Button>
+        </div>
       </div>
 
       {showForm && (

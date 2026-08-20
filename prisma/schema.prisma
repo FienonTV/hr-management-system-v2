@@ -45,6 +45,8 @@ model Tenant {
   projectEmployees   ProjectEmployee[]
   projectMilestones  ProjectMilestone[]
   projectMaterials   ProjectMaterial[]
+  projectCustomValues ProjectCustomValue[]
+  projectLayouts     ProjectLayout[]
   timeEntries        TimeEntry[]
   payrollExports     PayrollExport[]
   wooCommerceOrders  WooCommerceOrder[]
@@ -739,7 +741,7 @@ enum CustomFieldType {
 model CustomFieldDefinition {
   id          String          @id @default(cuid())
   tenantId    String          @map("tenant_id")
-  appliesTo   String          @map("applies_to") // e.g. "employee"
+  appliesTo   String          @map("applies_to") // e.g. "employee", "project"
   key         String
   name        String
   description String?
@@ -752,6 +754,7 @@ model CustomFieldDefinition {
   updatedAt   DateTime        @updatedAt @map("updated_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projectCustomValues ProjectCustomValue[]
 
   @@unique([tenantId, appliesTo, key])
   @@index([tenantId, appliesTo, isActive])
@@ -811,11 +814,46 @@ model Project {
   timeEntries TimeEntry[]
   files      File[]            @relation("ProjectFiles")
   dailyPlanSites DailyPlanSite[]
+  customValues ProjectCustomValue[]
 
   @@index([tenantId])
   @@index([tenantId, status])
   @@index([tenantId, startDate])
   @@map("projects")
+}
+
+model ProjectCustomValue {
+  id              String @id @default(cuid())
+  tenantId        String @map("tenant_id")
+  projectId       String @map("project_id")
+  definitionId    String @map("definition_id")
+  valueText       String? @map("value_text")
+  valueNumber     Decimal? @map("value_number") @db.Decimal(12, 4)
+  valueDate       DateTime? @map("value_date")
+  valueBoolean    Boolean? @map("value_boolean")
+  valueJson       Json?     // SELECT / MULTI_SELECT
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  tenant     Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project    Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  definition CustomFieldDefinition @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, projectId, definitionId])
+  @@index([tenantId, projectId])
+  @@map("project_custom_values")
+}
+
+model ProjectLayout {
+  id        String @id @default(cuid())
+  tenantId  String @map("tenant_id")
+  tabs      Json
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId])
+  @@map("project_layouts")
 }
 
 model ProjectEmployee {
