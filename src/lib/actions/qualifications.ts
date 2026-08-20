@@ -1,13 +1,13 @@
 'use server';
 
 import { withTenant } from "@/lib/db/tenant";
-import { requirePermission } from "@/lib/permissions";
+import { requirePermission, requireAnyPermission } from "@/lib/permissions";
 import { revalidatePath } from "next/cache";
 import { logAudit } from "@/lib/audit";
 import type { Qualification } from "@prisma/client";
 
 export async function getQualifications(): Promise<Qualification[]> {
-  const { tenantId } = await requirePermission("employees:read");
+  const { tenantId } = await requireAnyPermission("employees:read", "employees:read:all", "employees:read:own");
   return withTenant(tenantId, async (tx) => {
     return tx.qualification.findMany({
       where: { tenantId, isActive: true },

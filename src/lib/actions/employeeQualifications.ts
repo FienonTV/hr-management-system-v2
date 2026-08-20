@@ -1,7 +1,7 @@
 'use server';
 
 import { withTenant } from "@/lib/db/tenant";
-import { requirePermission } from "@/lib/permissions";
+import { requirePermission, requireAnyPermission } from "@/lib/permissions";
 import { revalidatePath } from "next/cache";
 import { logAudit } from "@/lib/audit";
 import { uploadFile } from "@/lib/actions/files";
@@ -26,7 +26,7 @@ function parseDate(value: string | Date | null | undefined): Date | undefined {
 export async function getEmployeeQualifications(
   employeeId: string
 ): Promise<EmployeeQualificationRecord[]> {
-  const { tenantId } = await requirePermission("employees:read");
+  const { tenantId } = await requireAnyPermission("employees:read", "employees:read:all", "employees:read:own");
   return withTenant(tenantId, async (tx) => {
     return tx.employeeQualification.findMany({
       where: { tenantId, employeeId },
@@ -219,7 +219,7 @@ export async function deleteEmployeeQualification(
 }
 
 export async function getExpiringQualifications(days = 90) {
-  const { tenantId } = await requirePermission("employees:read");
+  const { tenantId } = await requireAnyPermission("employees:read", "employees:read:all", "employees:read:own");
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() + days);
 
