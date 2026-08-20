@@ -336,9 +336,90 @@ export default function PlanningClient({
     <div className="space-y-4 p-4">
       <style>{`
         @media print {
-          body * { visibility: hidden !important; }
-          #print-area { visibility: visible !important; position: fixed !important; left: 0 !important; top: 0 !important; width: 100% !important; padding: 20px; font-size: 11px; background: white; }
-          #print-area * { visibility: visible !important; }
+          @page {
+            margin: 10mm;
+          }
+          body {
+            background: white !important;
+          }
+          body > div,
+          body > div > *,
+          header, aside, nav, .sidebar, [data-testid="sidebar"], #main-nav, .app-header, .dashboard-header {
+            display: none !important;
+          }
+          #print-area {
+            display: block !important;
+            visibility: visible !important;
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            min-height: 100vh !important;
+            padding: 0;
+            font-size: 11pt;
+            background: white;
+            color: black;
+            z-index: 99999 !important;
+          }
+          #print-area * {
+            visibility: visible !important;
+            color: black !important;
+            background: transparent !important;
+            box-shadow: none !important;
+          }
+          #print-area h2 {
+            font-size: 16pt;
+            margin-bottom: 16px;
+            border-bottom: 2px solid black;
+            padding-bottom: 6px;
+          }
+          #print-area .plan-site {
+            margin-bottom: 16px;
+            border: 1px solid #999;
+            padding: 12px;
+            page-break-inside: avoid;
+          }
+          #print-area .site-name {
+            font-size: 14pt;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            margin-bottom: 4px;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 4px;
+          }
+          #print-area .site-location {
+            font-size: 10pt;
+            font-weight: 600;
+            color: #333 !important;
+            margin-bottom: 6px;
+          }
+          #print-area .site-time {
+            font-size: 11pt;
+            font-weight: 600;
+            color: #000 !important;
+            margin-bottom: 10px;
+          }
+          #print-area .site-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            margin-top: 6px;
+            font-size: 10pt;
+            line-height: 1.4;
+          }
+          #print-area .site-row .label {
+            font-weight: 700;
+            min-width: 100px;
+            text-transform: uppercase;
+            font-size: 9pt;
+          }
+          #print-area .site-row .value {
+            flex: 1;
+            text-align: right;
+            font-weight: 500;
+          }
         }
       `}</style>
 
@@ -717,13 +798,18 @@ export default function PlanningClient({
       <div id="print-area" className="hidden print:block">
         <h2 className="text-lg font-bold mb-2">Tagesplanung {formatDateDE(date)}</h2>
         {sites.map((site) => (
-          <div key={site._tempId ?? site.id} className="mb-3 border-b pb-2">
-            <div className="font-semibold">{site.name} {site.location ? `– ${site.location}` : ""}</div>
-            <div className="text-xs text-gray-600">{site.startTime}–{site.endTime}</div>
-            <div className="text-xs mt-1">
-              Mitarbeiter: {site.assignments.map((a) => `${a.employee.firstName} ${a.employee.lastName}`).join(", ") || "–"}
+          <div key={site._tempId ?? site.id} className="plan-site mb-3 border-b pb-2">
+            <div className="site-name">{site.name}</div>
+            {site.location && <div className="site-location text-sm mb-1">{site.location}</div>}
+            <div className="site-time">{site.startTime} – {site.endTime}</div>
+            <div className="site-row">
+              <span className="label">Mitarbeiter:</span>
+              <span className="value">{site.assignments.map((a) => a.employee.lastName).join(", ") || "–"}</span>
             </div>
-            <div className="text-xs">Fahrzeuge: {site.vehiclePlates.join(", ") || "–"}</div>
+            <div className="site-row">
+              <span className="label">Fahrzeuge:</span>
+              <span className="value">{site.vehiclePlates.join(", ") || "–"}</span>
+            </div>
           </div>
         ))}
       </div>
