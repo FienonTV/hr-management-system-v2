@@ -87,7 +87,7 @@ interface PlanningClientProps {
   employees: PlanningEmployee[];
   vehicles: Vehicle[];
   projects: Project[];
-  departments: Department[];
+  departments: Array<{ id: string; name: string }>;
   settings: {
     defaultStartTime: string;
     defaultEndTime: string;

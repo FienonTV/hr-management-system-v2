@@ -303,6 +303,17 @@ export async function savePlanningSettings(settings: {
   });
 }
 
+export async function getPlanningDepartments(): Promise<Array<{ id: string; name: string }>> {
+  const { tenantId } = await requirePermission("planning:read");
+  return withTenant(tenantId, async (tx) => {
+    return tx.department.findMany({
+      where: { tenantId },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    });
+  });
+}
+
 export async function getActiveProjects(): Promise<Project[]> {
   const { tenantId } = await requirePermission("planning:read");
   return withTenant(tenantId, async (tx) => {
