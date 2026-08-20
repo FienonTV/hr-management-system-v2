@@ -292,10 +292,10 @@ export default function PlanningClient({
   }, []);
 
   const addManualSite = useCallback(() => {
-    setSites((prev) => [
-      ...prev,
-      {
-        _tempId: newTempId(),
+    const tempId = newTempId();
+    setSites((prev) => {
+      const newSite: PlanSite = {
+        _tempId: tempId,
         name: "Neue Baustelle",
         location: "",
         startTime: settings.defaultStartTime,
@@ -304,10 +304,12 @@ export default function PlanningClient({
         sortOrder: prev.length,
         assignments: [],
         isEditing: true,
-      },
-    ]);
-    setEditingSite(sites.length);
-  }, [settings.defaultStartTime, settings.defaultEndTime, sites.length]);
+      };
+      const next = [...prev, newSite];
+      setEditingSite(next.length - 1);
+      return next;
+    });
+  }, [settings.defaultStartTime, settings.defaultEndTime]);
 
   const navigateDate = (delta: number) => {
     router.push(`/dashboard/modules/planning/${nextWorkingDay(date, delta, settings.weekendMode)}`);
@@ -527,8 +529,8 @@ export default function PlanningClient({
                     <Input type="time" value={site.startTime} onChange={(e) => updateSiteField(siteIdx, "startTime", e.target.value)} className="w-24" />
                     <span className="text-gray-400 text-sm">–</span>
                     <Input type="time" value={site.endTime} onChange={(e) => updateSiteField(siteIdx, "endTime", e.target.value)} className="w-24" />
-                    <Button className="h-8 w-8 p-0" onClick={() => setEditingSite(null)}><Check className="h-4 w-4" /></Button>
-                    <Button className="h-8 w-8 p-0" variant="outline" onClick={() => setEditingSite(null)}><X className="h-4 w-4" /></Button>
+                    <Button className="h-8 w-8 p-0" onClick={() => { setEditingSite(null); saveToServer(sites); }}><Check className="h-4 w-4" /></Button>
+                    <Button className="h-8 w-8 p-0" variant="outline" onClick={() => { setEditingSite(null); removeSite(siteIdx); }}><X className="h-4 w-4" /></Button>
                   </div>
                 ) : (
                   <div className="flex items-center justify-between border-b border-gray-100 pl-2 pr-4 py-3">
