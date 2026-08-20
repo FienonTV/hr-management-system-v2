@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Pencil, Trash2, Briefcase } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 const statusLabels: Record<string, string> = {
   PLANNED: "Geplant",
@@ -18,6 +19,7 @@ const statusLabels: Record<string, string> = {
 };
 
 export default function ProjectsPage() {
+  const router = useRouter();
   const [projects, setProjects] = useState<ProjectWithDetails[]>([]);
   const [employees, setEmployees] = useState<{ id: string; firstName: string; lastName: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -240,7 +242,8 @@ export default function ProjectsPage() {
                   ))}
                 </div>
                 <div className="flex justify-end gap-2 pt-2">
-                  <Button variant="outline" className="px-2 py-1" onClick={() => startEdit(p)}>
+                  <Link href={`/dashboard/modules/projects/${p.id}`} className="inline-flex items-center justify-center rounded-md border bg-background px-3 py-1 text-sm font-medium hover:bg-accent">Details</Link>
+                  <Button variant="outline" className="px-2 py-1" onClick={() => router.push(`/dashboard/modules/projects/${p.id}?edit=true`)}>
                     <Pencil className="h-4 w-4" />
                   </Button>
                   <Button variant="destructive" className="px-2 py-1" onClick={() => handleDelete(p.id)}>
