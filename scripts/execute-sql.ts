@@ -18,7 +18,7 @@ const pool = new Pool({ connectionString });
 async function main() {
   const sql = fs.readFileSync(path.resolve(sqlFile), "utf-8");
   const result = await pool.query(sql);
-  if (result.rows.length > 0) {
+  if (result.rows && result.rows.length > 0) {
     console.log(JSON.stringify(result.rows, null, 2));
   } else {
     console.log("SQL executed successfully");

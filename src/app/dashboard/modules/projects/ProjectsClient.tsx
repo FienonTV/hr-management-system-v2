@@ -27,6 +27,7 @@ export default function ProjectsPage() {
     name: "",
     description: "",
     status: "PLANNED" as const,
+    availableForPlanning: false,
     startDate: "",
     endDate: "",
     budget: "",
@@ -52,6 +53,7 @@ export default function ProjectsPage() {
       name: project.name,
       description: project.description ?? "",
       status: project.status as typeof form.status,
+      availableForPlanning: (project as any).availableForPlanning ?? false,
       startDate: project.startDate ? new Date(project.startDate).toISOString().split("T")[0] : "",
       endDate: project.endDate ? new Date(project.endDate).toISOString().split("T")[0] : "",
       budget: project.budget?.toString() ?? "",
@@ -62,7 +64,7 @@ export default function ProjectsPage() {
 
   function startCreate() {
     setEditing(null);
-    setForm({ name: "", description: "", status: "PLANNED", startDate: "", endDate: "", budget: "", employeeIds: [] });
+    setForm({ name: "", description: "", status: "PLANNED", availableForPlanning: false, startDate: "", endDate: "", budget: "", employeeIds: [] });
     setError("");
     setShowForm(true);
   }
@@ -170,6 +172,16 @@ export default function ProjectsPage() {
                   <Input id="endDate" type="date" value={form.endDate} onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))} />
                 </div>
               </div>
+              <div className="flex items-center gap-2 rounded-md border p-3">
+                <input
+                  id="availableForPlanning"
+                  type="checkbox"
+                  checked={form.availableForPlanning}
+                  onChange={(e) => setForm((f) => ({ ...f, availableForPlanning: e.target.checked }))}
+                  className="rounded"
+                />
+                <Label htmlFor="availableForPlanning" className="mb-0 cursor-pointer">Für Einsatzplanung freigeben</Label>
+              </div>
               <div className="space-y-2">
                 <Label>Mitarbeiter</Label>
                 <div className="max-h-32 overflow-y-auto border rounded-md p-2 space-y-1">
@@ -216,6 +228,11 @@ export default function ProjectsPage() {
               <CardContent className="space-y-2">
                 {p.description && <p className="text-sm">{p.description}</p>}
                 <div className="flex flex-wrap gap-1">
+                  {(p as any).availableForPlanning && (
+                    <span className="inline-flex items-center rounded-full bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700">
+                      Für Einsatzplanung freigegeben
+                    </span>
+                  )}
                   {p.employees.map((pe) => (
                     <span key={pe.id} className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium">
                       {pe.employee.firstName} {pe.employee.lastName}

@@ -332,7 +332,7 @@ export async function getActiveProjects(): Promise<Project[]> {
   const { tenantId } = await requirePermission("planning:read");
   return withTenant(tenantId, async (tx) => {
     return tx.project.findMany({
-      where: { tenantId, status: "ACTIVE" },
+      where: { tenantId, availableForPlanning: true },
       orderBy: { name: "asc" },
     });
   });

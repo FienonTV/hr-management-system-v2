@@ -52,6 +52,7 @@ export async function createProject(data: {
   name: string;
   description?: string;
   status?: ProjectStatus;
+  availableForPlanning?: boolean;
   startDate?: string | Date | null;
   endDate?: string | Date | null;
   budget?: number | null;
@@ -68,6 +69,7 @@ export async function createProject(data: {
         name: data.name,
         description: data.description ?? null,
         status: data.status ?? "PLANNED",
+        availableForPlanning: data.availableForPlanning ?? false,
         startDate: start ?? null,
         endDate: end ?? null,
         budget: data.budget ?? null,
@@ -109,6 +111,7 @@ export async function updateProject(
     name?: string;
     description?: string;
     status?: ProjectStatus;
+    availableForPlanning?: boolean;
     startDate?: string | Date | null;
     endDate?: string | Date | null;
     budget?: number | null;
@@ -129,6 +132,7 @@ export async function updateProject(
         name: data.name,
         description: data.description,
         status: data.status,
+        availableForPlanning: data.availableForPlanning,
         startDate: start ?? existing.startDate,
         endDate: end ?? existing.endDate,
         budget: data.budget ?? existing.budget,
