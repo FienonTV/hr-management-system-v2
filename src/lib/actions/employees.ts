@@ -188,16 +188,16 @@ export async function getEmployeeById(id: string): Promise<(Employee & { userAcc
 
   return withTenant(tenantId, async (tx) => {
     const employee = await tx.employee.findFirst({
-      where: {
-        id,
-        tenantId,
-        ...(canReadAll ? {} : { userAccount: { id: session.user.id } }),
-      },
+      where: { id, tenantId },
       include: { userAccount: true, position: { select: { name: true, id: true } }, department: { select: { name: true, id: true } }, payGrade: { select: { name: true, id: true } } },
     });
     if (!employee) return null;
 
     const isOwn = employee.userAccount?.id === session.user.id;
+    if (!canReadAll && !isOwn) {
+      // User may only see own record and this one is not theirs
+      return null;
+    }
 
     const canReadPersonalInfo = canReadEmployeeGroup(permissions, "personal_info", isOwn);
     const canReadEmployment = canReadEmployeeGroup(permissions, "employment", isOwn);
