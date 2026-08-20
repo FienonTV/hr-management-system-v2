@@ -342,14 +342,20 @@ export default function PlanningClient({
           body {
             background: white !important;
           }
-          body > div,
-          body > div > *,
+          body > *:not(#print-area),
+          body > * > *:not(#print-area):not(#print-area *),
           header, aside, nav, .sidebar, [data-testid="sidebar"], #main-nav, .app-header, .dashboard-header {
             display: none !important;
           }
-          #print-area {
-            display: block !important;
+          #print-area,
+          #print-area * {
+            display: revert !important;
             visibility: visible !important;
+            color: black !important;
+            background: transparent !important;
+            box-shadow: none !important;
+          }
+          #print-area {
             position: absolute !important;
             left: 0 !important;
             top: 0 !important;
@@ -360,12 +366,6 @@ export default function PlanningClient({
             background: white;
             color: black;
             z-index: 99999 !important;
-          }
-          #print-area * {
-            visibility: visible !important;
-            color: black !important;
-            background: transparent !important;
-            box-shadow: none !important;
           }
           #print-area h2 {
             font-size: 16pt;
@@ -401,7 +401,7 @@ export default function PlanningClient({
             margin-bottom: 10px;
           }
           #print-area .site-row {
-            display: flex;
+            display: flex !important;
             justify-content: space-between;
             align-items: flex-start;
             gap: 12px;
