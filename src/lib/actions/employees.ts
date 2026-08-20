@@ -15,6 +15,7 @@ import type { EmployeeBaseInput, CreateEmployeeInput, UpdateEmployeeInput } from
 import { logAudit } from "@/lib/audit";
 import { hashPassword, generateTemporaryPassword } from "@/lib/passwordPolicy";
 import { getCustomFieldDefinitions } from "@/lib/actions/employeeCatalogs";
+import { canReadEmployeeGroup } from "@/lib/employeePermissions";
 
 function cleanEmployeeDataForPrisma(data: Record<string, unknown>): any {
   const cleaned = { ...data };
@@ -184,10 +185,6 @@ export async function getEmployeeById(id: string): Promise<(Employee & { userAcc
   const { tenantId, session } = await requirePermission("employees:read:own");
   const permissions = await getEffectivePermissions(session.user.id, tenantId);
   const canReadAll = permissions.has("employees:read") || permissions.has("employees:read:all");
-  const canReadPublic = canReadAll || permissions.has("employees:read:public");
-  const canReadPersonal = canReadAll || permissions.has("employees:read:personal");
-  const canReadContract = canReadAll || permissions.has("employees:read:contract");
-  const canReadHrConfidential = canReadAll || permissions.has("employees:read:hr_confidential");
 
   return withTenant(tenantId, async (tx) => {
     const employee = await tx.employee.findFirst({
@@ -200,54 +197,76 @@ export async function getEmployeeById(id: string): Promise<(Employee & { userAcc
     });
     if (!employee) return null;
 
+    const isOwn = employee.userAccount?.id === session.user.id;
+
+    const canReadPersonalInfo = canReadEmployeeGroup(permissions, "personal_info", isOwn);
+    const canReadEmployment = canReadEmployeeGroup(permissions, "employment", isOwn);
+    const canReadAddress = canReadEmployeeGroup(permissions, "address", isOwn);
+    const canReadBankTax = canReadEmployeeGroup(permissions, "bank_tax", isOwn);
+    const canReadEmergency = canReadEmployeeGroup(permissions, "emergency", isOwn);
+    const canReadHrMisc = canReadEmployeeGroup(permissions, "hr_misc", isOwn);
+
     const address = employee.address as Record<string, string | null | undefined> | null | undefined;
     const sensitiveData = employee.sensitiveData as Record<string, string | null | undefined> | null | undefined;
 
     return {
       id: employee.id,
       tenantId: employee.tenantId,
-      firstName: canReadPublic ? employee.firstName : null,
-      lastName: canReadPublic ? employee.lastName : null,
-      email: canReadPublic ? employee.email : null,
-      phone: canReadPublic ? employee.phone : null,
-      departmentId: canReadPublic ? employee.departmentId : null,
-      positionId: canReadPublic ? employee.positionId : null,
-      employmentType: canReadPublic ? employee.employmentType : null,
-      status: canReadPublic ? employee.status : null,
-      birthDate: canReadPersonal ? employee.birthDate : null,
-      gender: canReadPersonal ? employee.gender : null,
-      address: canReadPersonal ? employee.address : null,
-      notes: canReadPersonal ? employee.notes : null,
-      street: canReadPersonal ? address?.street ?? null : null,
-      zip: canReadPersonal ? address?.zip ?? null : null,
-      city: canReadPersonal ? address?.city ?? null : null,
-      country: canReadPersonal ? address?.country ?? null : null,
-      employeeNumber: canReadContract ? employee.employeeNumber : null,
-      startDate: canReadContract ? employee.startDate : null,
-      exitDate: canReadContract ? employee.exitDate : null,
-      hourlyWage: canReadContract ? (employee.hourlyWage ? Number(employee.hourlyWage) : null) : null,
-      vacationDays: canReadContract ? employee.vacationDays : null,
-      probationEndDate: canReadContract ? employee.probationEndDate : null,
-      fixedTermEndDate: canReadContract ? employee.fixedTermEndDate : null,
-      payGradeId: canReadContract ? employee.payGradeId : null,
-      keyNumber: canReadHrConfidential ? employee.keyNumber : null,
-      chipNumber: canReadHrConfidential ? employee.chipNumber : null,
-      driverLicenseClasses: canReadHrConfidential ? employee.driverLicenseClasses : null,
-      forkliftLicense: canReadHrConfidential ? employee.forkliftLicense : null,
-      sensitiveData: canReadHrConfidential ? employee.sensitiveData : null,
-      taxId: canReadHrConfidential ? sensitiveData?.taxId ?? null : null,
-      socialSecurityNumber: canReadHrConfidential ? sensitiveData?.socialSecurityNumber ?? null : null,
-      iban: canReadHrConfidential ? sensitiveData?.iban ?? null : null,
-      bic: canReadHrConfidential ? sensitiveData?.bic ?? null : null,
-      emergencyContactName: canReadHrConfidential ? sensitiveData?.emergencyContactName ?? null : null,
-      emergencyContactPhone: canReadHrConfidential ? sensitiveData?.emergencyContactPhone ?? null : null,
-      customFields: canReadHrConfidential ? employee.customFields : null,
+
+      // personal_info
+      firstName: canReadPersonalInfo ? employee.firstName : null,
+      lastName: canReadPersonalInfo ? employee.lastName : null,
+      email: canReadPersonalInfo ? employee.email : null,
+      phone: canReadPersonalInfo ? employee.phone : null,
+      birthDate: canReadPersonalInfo ? employee.birthDate : null,
+      gender: canReadPersonalInfo ? employee.gender : null,
+
+      // employment
+      employeeNumber: canReadEmployment ? employee.employeeNumber : null,
+      status: canReadEmployment ? employee.status : null,
+      employmentType: canReadEmployment ? employee.employmentType : null,
+      startDate: canReadEmployment ? employee.startDate : null,
+      exitDate: canReadEmployment ? employee.exitDate : null,
+      probationEndDate: canReadEmployment ? employee.probationEndDate : null,
+      fixedTermEndDate: canReadEmployment ? employee.fixedTermEndDate : null,
+      vacationDays: canReadEmployment ? employee.vacationDays : null,
+      hourlyWage: canReadEmployment ? (employee.hourlyWage ? Number(employee.hourlyWage) : null) : null,
+      departmentId: canReadEmployment ? employee.departmentId : null,
+      positionId: canReadEmployment ? employee.positionId : null,
+      payGradeId: canReadEmployment ? employee.payGradeId : null,
+
+      // address
+      address: canReadAddress ? employee.address : null,
+      street: canReadAddress ? address?.street ?? null : null,
+      zip: canReadAddress ? address?.zip ?? null : null,
+      city: canReadAddress ? address?.city ?? null : null,
+      country: canReadAddress ? address?.country ?? null : null,
+
+      // bank_tax
+      taxId: canReadBankTax ? sensitiveData?.taxId ?? null : null,
+      socialSecurityNumber: canReadBankTax ? sensitiveData?.socialSecurityNumber ?? null : null,
+      iban: canReadBankTax ? sensitiveData?.iban ?? null : null,
+      bic: canReadBankTax ? sensitiveData?.bic ?? null : null,
+
+      // emergency
+      emergencyContactName: canReadEmergency ? sensitiveData?.emergencyContactName ?? null : null,
+      emergencyContactPhone: canReadEmergency ? sensitiveData?.emergencyContactPhone ?? null : null,
+
+      // hr_misc
+      keyNumber: canReadHrMisc ? employee.keyNumber : null,
+      chipNumber: canReadHrMisc ? employee.chipNumber : null,
+      driverLicenseClasses: canReadHrMisc ? employee.driverLicenseClasses : null,
+      forkliftLicense: canReadHrMisc ? employee.forkliftLicense : null,
+      notes: canReadHrMisc ? employee.notes : null,
+      sensitiveData: canReadBankTax || canReadEmergency || canReadHrMisc ? employee.sensitiveData : null,
+      customFields: canReadHrMisc ? employee.customFields : null,
+
       createdAt: employee.createdAt,
       updatedAt: employee.updatedAt,
-      userAccount: canReadPublic ? employee.userAccount : null,
-      position: canReadPublic ? employee.position : null,
-      department: canReadPublic ? employee.department : null,
-      payGrade: canReadContract ? employee.payGrade : null,
+      userAccount: canReadPersonalInfo ? employee.userAccount : null,
+      position: canReadEmployment ? employee.position : null,
+      department: canReadEmployment ? employee.department : null,
+      payGrade: canReadEmployment ? employee.payGrade : null,
     } as unknown as Employee & { userAccount?: User | null; position?: { name: string; id: string } | null; department?: { name: string; id: string } | null; payGrade?: { name: string; id: string } | null; customFields?: Prisma.JsonValue | null };
   });
 }
