@@ -45,8 +45,13 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
             setPositions(Object.fromEntries(pos.map((p) => [p.id, p.name])));
             setPayGrades(Object.fromEntries(pgs.map((pg) => [pg.id, pg.name])));
             setCustomFields(defs.map((d) => ({ id: d.id, key: d.key, name: d.name, fieldType: d.fieldType })));
-            const fileResult = await listFiles({ employeeId: id, limit: 100 });
-            setFiles(fileResult.files);
+            try {
+              const fileResult = await listFiles({ employeeId: id, limit: 100 });
+              setFiles(fileResult.files);
+            } catch {
+              // If user lacks files:read, leave files empty
+              setFiles([]);
+            }
           } else {
             setError("Mitarbeiter nicht gefunden");
           }
