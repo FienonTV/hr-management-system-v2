@@ -33,26 +33,24 @@ export async function getEffectivePermissions(
       return new Set(permissions.map((p) => p.key));
     }
 
-    const keys = new Set<string>();
-
-    // Legacy compatibility: old employees:read grants employees:read:all behaviour
-    const hasLegacyRead = permissions.some((p) => p.key === "employees:read");
-    const hasLegacyUpdate = permissions.some((p) => p.key === "employees:update");
-    if (hasLegacyRead) {
-      keys.add("employees:read:all");
-    }
-    if (hasLegacyUpdate) {
-      keys.add("employees:update:all");
-    }
-
     const rolePermissions = await tx.rolePermission.findMany({
       where: {
         role: { users: { some: { userId } } },
       },
       include: { permission: true },
     });
+
+    const keys = new Set<string>();
     for (const rp of rolePermissions) {
       keys.add(rp.permission.key);
+    }
+
+    // Legacy compatibility: old employees:read grants employees:read:all behaviour
+    if (keys.has("employees:read")) {
+      keys.add("employees:read:all");
+    }
+    if (keys.has("employees:update")) {
+      keys.add("employees:update:all");
     }
 
     const userPermissions = await tx.userPermission.findMany({
@@ -65,6 +63,14 @@ export async function getEffectivePermissions(
       } else {
         keys.delete(up.permission.key);
       }
+    }
+
+    // Legacy also applies to user-level grants
+    if (keys.has("employees:read")) {
+      keys.add("employees:read:all");
+    }
+    if (keys.has("employees:update")) {
+      keys.add("employees:update:all");
     }
 
     return keys;
