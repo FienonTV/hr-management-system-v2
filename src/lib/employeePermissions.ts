@@ -34,7 +34,8 @@ export function updateAllPermission(group: EmployeeFieldGroup): string {
 /**
  * Checks whether the user can read a specific employee field group.
  * `isOwn` should be true when the employee record belongs to the current user.
- * Legacy permissions employees:read (all) and employees:read:all still grant full access.
+ * Legacy permissions employees:read (all) and employees:read:all grant full access.
+ * employees:read:own grants read access to all own groups unless a specific group permission is denied.
  */
 export function canReadEmployeeGroup(
   permissions: Set<string>,
@@ -45,6 +46,9 @@ export function canReadEmployeeGroup(
     return true;
   }
   if (permissions.has(readAllPermission(group))) {
+    return true;
+  }
+  if (isOwn && permissions.has("employees:read:own")) {
     return true;
   }
   if (isOwn && permissions.has(readOwnPermission(group))) {
@@ -65,6 +69,9 @@ export function canUpdateEmployeeGroup(
     return true;
   }
   if (permissions.has(updateAllPermission(group))) {
+    return true;
+  }
+  if (isOwn && permissions.has("employees:update:own")) {
     return true;
   }
   if (isOwn && permissions.has(updateOwnPermission(group))) {
