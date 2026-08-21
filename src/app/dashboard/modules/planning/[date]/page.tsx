@@ -17,7 +17,7 @@ function serializePlan(plan: DailyPlanWithSites | null): DailyPlanWithSites | nu
 }
 
 export default async function DailyPlanningPage({ params }: { params: Promise<{ date: string }> }) {
-  await guardModule("planning");
+  await guardModule("planning", "planning:read");
   const session = await auth();
   if (!session?.user) redirect("/login");
 

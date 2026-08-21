@@ -2,6 +2,6 @@ import { guardModule } from "@/lib/actions/moduleGuard";
 import Client from "./Client";
 
 export default async function Page() {
-  await guardModule("payroll");
+  await guardModule("payroll", "payroll:read");
   return <Client />;
 }

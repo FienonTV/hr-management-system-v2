@@ -1,3 +1,4 @@
+import { guardModule } from "@/lib/actions/moduleGuard";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import {
@@ -11,6 +12,7 @@ import { getCurrentUserPermissions } from "@/lib/actions/permissions";
 import { DocumentTemplatesClient } from "./DocumentTemplatesClient";
 
 export default async function DocumentTemplatesPage() {
+  await guardModule("employees", "employees:read");
   const [templatesResult, categoriesResult, permissions] = await Promise.all([
     getDocumentTemplates(true),
     getDocumentCategories(true),

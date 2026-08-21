@@ -1,3 +1,4 @@
+import { guardModule } from "@/lib/actions/moduleGuard";
 import Link from "next/link";
 import {
   Building2,
@@ -28,6 +29,7 @@ const settingsLinks = [
 ];
 
 export default async function SettingsPage() {
+  await guardModule("settings");
   const session = await auth();
   if (!session?.user) redirect("/login");
 

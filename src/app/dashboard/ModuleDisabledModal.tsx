@@ -26,7 +26,7 @@ export default function ModuleDisabledModal() {
           <h2 className="text-lg font-semibold">Modul nicht verfügbar</h2>
         </div>
         <p className="mb-6 text-sm text-gray-600">
-          Sie besitzen keine Berechtigung, auf dieses Modul zuzugreifen, oder es wurde für Ihre Firma deaktiviert. Wenden Sie sich an Ihren Administrator.
+          Sie besitzen keine Berechtigung auf dieses Modul zuzugreifen. Wenden Sie sich an Ihren Admin.
         </p>
         <div className="flex justify-end">
           <Button

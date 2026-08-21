@@ -18,7 +18,7 @@ function groupPermissionsByModule(permissions: Permission[]) {
 }
 
 export default async function RolesPage() {
-  await guardModule("roles");
+  await guardModule("roles", "roles:read");
   const session = await auth();
   if (!session?.user) redirect("/login");
 

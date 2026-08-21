@@ -6,7 +6,7 @@ import { guardModule } from "@/lib/actions/moduleGuard";
 import { getCurrentUserPermissions } from "@/lib/permissions";
 
 export default async function EmployeesPage() {
-  await guardModule("employees");
+  await guardModule("employees", "employees:read");
   const session = await auth();
   if (!session?.user) redirect("/login");
 

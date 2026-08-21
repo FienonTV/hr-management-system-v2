@@ -118,7 +118,6 @@ export default function ProjectsPage() {
           <h1 className="text-2xl font-bold">Projekte</h1>
         </div>
         <div className="flex items-center gap-2">
-          <Link href="/dashboard/modules/admin/project-layout" className="text-sm text-primary hover:underline">Layout bearbeiten</Link>
           <Button onClick={startCreate}>
             <Plus className="mr-2 h-4 w-4" />
             Neues Projekt

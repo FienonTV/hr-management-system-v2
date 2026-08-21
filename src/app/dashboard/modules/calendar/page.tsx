@@ -6,7 +6,7 @@ import CalendarClient from "./CalendarClient";
 import { guardModule } from "@/lib/actions/moduleGuard";
 
 export default async function CalendarPage() {
-  await guardModule("calendar");
+  await guardModule("calendar", "calendar:read");
   const session = await auth();
   if (!session?.user) redirect("/login");
 

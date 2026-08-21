@@ -222,11 +222,16 @@ type DragItem =
 export default function ProjectLayoutEditorClient({
   initialTabs,
   fieldDefinitions: initialFieldDefinitions,
+  permissions = [],
 }: {
   initialTabs?: ProjectLayoutTab[];
   fieldDefinitions: CustomFieldDefinition[];
+  permissions?: string[];
 }) {
   const router = useRouter();
+  const canUpdateLayout = permissions.includes("projectLayout:update");
+  const canUpdateFields = permissions.includes("projectCustomFields:update");
+
   const [tabs, setTabs] = useState<ProjectLayoutTab[]>(initialTabs?.length ? initialTabs : DEFAULT_PROJECT_LAYOUT);
   const [activeTabId, setActiveTabId] = useState<string>(tabs[0]?.id ?? "");
   const [saving, setSaving] = useState(false);
@@ -477,7 +482,7 @@ export default function ProjectLayoutEditorClient({
             <LayoutTemplate className="h-6 w-6" />
             <h1 className="text-2xl font-bold">Projekt-Layout-Editor</h1>
           </div>
-          <Button onClick={handleSave} disabled={saving}>
+          <Button onClick={handleSave} disabled={saving || !canUpdateLayout}>
             <Save className="mr-2 h-4 w-4" />
             {saving ? "Speichern..." : "Layout speichern"}
           </Button>
@@ -517,7 +522,7 @@ export default function ProjectLayoutEditorClient({
               <>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-500">{activeTab.title} &#183; {activeTab.cards.length} Sektionen</span>
-                  <Button onClick={() => addCard(activeTab.id)} variant="outline" className="gap-1">
+                  <Button onClick={() => addCard(activeTab.id)} variant="outline" className="gap-1" disabled={!canUpdateLayout}>
                     <Plus className="h-4 w-4" />
                     Sektion
                   </Button>
@@ -564,7 +569,7 @@ export default function ProjectLayoutEditorClient({
                 <CardTitle className="text-sm font-medium text-gray-600">Feld-Pool</CardTitle>
               </CardHeader>
               <CardContent className="space-y-5">
-                <Button onClick={() => setShowNewFieldDialog(true)} variant="outline" className="w-full gap-1">
+                <Button onClick={() => setShowNewFieldDialog(true)} variant="outline" className="w-full gap-1" disabled={!canUpdateFields}>
                   <Plus className="h-4 w-4" />
                   Feld definieren
                 </Button>
@@ -596,7 +601,7 @@ export default function ProjectLayoutEditorClient({
                         key={field.id}
                         field={{ id: field.id, key: field.key, name: field.name, fieldType: field.fieldType }}
                         onAdd={() => activeTab?.cards[0] && addField(activeTab.id, activeTab.cards[activeTab.cards.length - 1].id, field.key)}
-                        onDelete={() => handleDeleteField(field.id)}
+                        onDelete={canUpdateFields ? () => handleDeleteField(field.id) : undefined}
                         disabled={!activeTab?.cards.length}
                       />
                     ))

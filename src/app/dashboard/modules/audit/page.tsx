@@ -50,7 +50,7 @@ export default async function AuditLogPage({
 }: {
   searchParams: Promise<{ action?: string; resourceType?: string; userId?: string; from?: string; to?: string; page?: string }>;
 }) {
-  await guardModule("audit");
+  await guardModule("audit", "audit:read");
   const session = await auth();
   if (!session?.user) redirect("/login");
 

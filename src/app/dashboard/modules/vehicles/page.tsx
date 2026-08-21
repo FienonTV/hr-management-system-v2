@@ -5,7 +5,7 @@ import VehiclesClient from "./VehiclesClient";
 import { guardModule } from "@/lib/actions/moduleGuard";
 
 export default async function VehiclesPage() {
-  await guardModule("vehicles");
+  await guardModule("vehicles", "vehicles:read");
   const session = await auth();
   if (!session?.user) redirect("/login");
 

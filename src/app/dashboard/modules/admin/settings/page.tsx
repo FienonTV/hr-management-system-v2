@@ -1,9 +1,11 @@
+import { guardModule } from "@/lib/actions/moduleGuard";
 import Link from "next/link";
 import { getTenantSettings, getLetterheadSettings } from "@/lib/actions/tenantSettings";
 import LetterheadForm from "./LetterheadForm";
 import TenantSettingsClient from "./TenantSettingsClient";
 
 export default async function AdminSettingsPage() {
+  await guardModule("settings");
   const [settings, letterhead] = await Promise.all([
     getTenantSettings(),
     getLetterheadSettings(),

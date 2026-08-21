@@ -5,6 +5,7 @@ import type { CustomFieldDefinition } from "@prisma/client";
 import type { ProjectLayoutTab } from "@/lib/projectLayout";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const CORE_FIELD_CONFIG: Record<string, { label: string; type: "text" | "textarea" }> = {
   code: { label: "Projektnummer", type: "text" },
@@ -190,38 +191,41 @@ export default function ProjectFormRenderer({
       )}
 
       {activeTab ? (
-        <div className="space-y-4">
+        <div className="space-y-6">
           {activeTab.cards.map((card) => (
-            <div key={card.id} className="rounded-lg border p-4 space-y-3">
-              <h3 className="font-semibold text-sm">{card.title}</h3>
-              <div
-                className={`grid gap-4 ${
-                  card.columns === 1 ? "grid-cols-1" : card.columns === 2 ? "grid-cols-2" : "grid-cols-3"
-                }`}
-              >
-                {Array.from({ length: card.columns }).map((_, colIdx) => (
-                  <div key={colIdx} className="space-y-3">
-                    {card.fields
-                      .filter((f) => f.columnIndex === colIdx)
-                      .sort((a, b) => a.sortOrder - b.sortOrder)
-                      .map((field) => {
-                        const def = resolveDefinition(field.definitionId);
-                        return (
-                          <div key={field.id} className="space-y-1">
-                            <Label className="text-sm">{def.name}</Label>
-                            <SingleFieldInput
-                              definition={def as any}
-                              value={values[field.definitionId]}
-                              onChange={(val) => onChange?.(field.definitionId, val)}
-                              disabled={disabled}
-                            />
-                          </div>
-                        );
-                      })}
-                  </div>
-                ))}
-              </div>
-            </div>
+            <Card key={card.id}>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">{card.title}</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div
+                  className={`grid gap-6 ${
+                    card.columns === 1 ? "grid-cols-1" : card.columns === 2 ? "grid-cols-2" : "grid-cols-3"
+                  }`}
+                >
+                  {Array.from({ length: card.columns }).map((_, colIdx) => (
+                    <div key={colIdx} className="space-y-4">
+                      {card.fields
+                        .filter((f) => f.columnIndex === colIdx)
+                        .sort((a, b) => a.sortOrder - b.sortOrder)
+                        .map((field) => {
+                          const def = resolveDefinition(field.definitionId);
+                          return (
+                            <div key={field.id} className="space-y-1.5">
+                              <Label className="text-sm">{def.name}</Label>
+                              <SingleFieldInput
+                                definition={def as any}
+                                value={values[field.definitionId]}
+                                onChange={(val) => onChange?.(field.definitionId, val)}
+                              />
+                            </div>
+                          );
+                        })}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       ) : (
